@@ -1,3 +1,11 @@
 HELLOOOOOOOOOO GANG!!!!
 
 HIII
+
+To-Do:
+At last remove super() from :
+Account
+Customer
+IncomingTransactions
+SettlementResult
+Transactions
