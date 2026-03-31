@@ -15,7 +15,6 @@ public final class IncomingTransaction extends BaseEntity {
 	private ProcessingStatus processingStatus;
 
 	public IncomingTransaction(Long sourceSystemId, TransactionType txnType, BigDecimal amount) {
-		super();
 		this.sourceSystemId = sourceSystemId;
 		this.txnType = txnType;
 		this.amount = amount;

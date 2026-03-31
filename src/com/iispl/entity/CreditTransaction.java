@@ -7,15 +7,17 @@ import java.time.LocalDateTime;
 
 public final class CreditTransaction extends Transaction {
 
-	private final Account creditAccount;
+    private final Long creditAccountId;
 
-	public CreditTransaction(SourceSystem sourceSystem, ChannelType channel, Bank fromBank, Bank toBank,
-			BigDecimal amount, LocalDateTime txnDate, Account creditAccount) {
-		super(sourceSystem, channel, fromBank, toBank, amount, txnDate);
-		this.creditAccount = creditAccount;
-	}
+    public CreditTransaction(Long sourceSystemId, ChannelType channel,
+                             Long fromBankId, Long toBankId,
+                             BigDecimal amount, LocalDateTime txnDate,
+                             Long creditAccountId) {
+        super(sourceSystemId, channel, fromBankId, toBankId, amount, txnDate);
+        this.creditAccountId = creditAccountId;
+    }
 
-	public Account getCreditAccount() {
-		return creditAccount;
-	}
+    public Long getCreditAccountId() {
+        return creditAccountId;
+    }
 }

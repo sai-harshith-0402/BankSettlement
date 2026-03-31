@@ -7,21 +7,24 @@ import java.time.LocalDateTime;
 
 public final class ReversalTransaction extends Transaction {
 
-	private final Transaction originalTransaction;
-	private final String reversalReason;
+    private final Long originalTransactionId;
+    private final String reversalReason;
 
-	public ReversalTransaction(SourceSystem sourceSystem, ChannelType channel, Bank fromBank, Bank toBank,
-			BigDecimal amount, LocalDateTime txnDate, Transaction originalTransaction, String reversalReason) {
-		super(sourceSystem, channel, fromBank, toBank, amount, txnDate);
-		this.originalTransaction = originalTransaction;
-		this.reversalReason = reversalReason;
-	}
+    public ReversalTransaction(Long sourceSystemId, ChannelType channel,
+                               Long fromBankId, Long toBankId,
+                               BigDecimal amount, LocalDateTime txnDate,
+                               Long originalTransactionId,
+                               String reversalReason) {
+        super(sourceSystemId, channel, fromBankId, toBankId, amount, txnDate);
+        this.originalTransactionId = originalTransactionId;
+        this.reversalReason = reversalReason;
+    }
 
-	public Transaction getOriginalTransaction() {
-		return originalTransaction;
-	}
+    public Long getOriginalTransactionId() {
+        return originalTransactionId;
+    }
 
-	public String getReversalReason() {
-		return reversalReason;
-	}
+    public String getReversalReason() {
+        return reversalReason;
+    }
 }

@@ -7,15 +7,17 @@ import java.time.LocalDateTime;
 
 public final class DebitTransaction extends Transaction {
 
-	private final Account debitAccount;
+    private final Long debitAccountId;
 
-	public DebitTransaction(SourceSystem sourceSystem, ChannelType channel, Bank fromBank, Bank toBank,
-			BigDecimal amount, LocalDateTime txnDate, Account debitAccount) {
-		super(sourceSystem, channel, fromBank, toBank, amount, txnDate);
-		this.debitAccount = debitAccount;
-	}
+    public DebitTransaction(Long sourceSystemId, ChannelType channel,
+                            Long fromBankId, Long toBankId,
+                            BigDecimal amount, LocalDateTime txnDate,
+                            Long debitAccountId) {
+        super(sourceSystemId, channel, fromBankId, toBankId, amount, txnDate);
+        this.debitAccountId = debitAccountId;
+    }
 
-	public Account getDebitAccount() {
-		return debitAccount;
-	}
+    public Long getDebitAccountId() {
+        return debitAccountId;
+    }
 }

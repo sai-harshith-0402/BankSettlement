@@ -14,7 +14,6 @@ public final class Account extends BaseEntity {
 	private String status;
 
 	public Account(String accountNumber, AccountType accountType, Long customerId, Long bankId, BigDecimal balance) {
-		super();
 		this.accountNumber = accountNumber;
 		this.accountType = accountType;
 		this.customerId = customerId;

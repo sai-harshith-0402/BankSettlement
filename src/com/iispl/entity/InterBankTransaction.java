@@ -7,15 +7,17 @@ import java.time.LocalDateTime;
 
 public final class InterBankTransaction extends Transaction {
 
-	private final Account nostroAccount;
+    private final Long nostroAccountId;
 
-	public InterBankTransaction(SourceSystem sourceSystem, ChannelType channel, Bank fromBank, Bank toBank,
-			BigDecimal amount, LocalDateTime txnDate, Account nostroAccount) {
-		super(sourceSystem, channel, fromBank, toBank, amount, txnDate);
-		this.nostroAccount = nostroAccount;
-	}
+    public InterBankTransaction(Long sourceSystemId, ChannelType channel,
+                                Long fromBankId, Long toBankId,
+                                BigDecimal amount, LocalDateTime txnDate,
+                                Long nostroAccountId) {
+        super(sourceSystemId, channel, fromBankId, toBankId, amount, txnDate);
+        this.nostroAccountId = nostroAccountId;
+    }
 
-	public Account getNostroAccount() {
-		return nostroAccount;
-	}
+    public Long getNostroAccountId() {
+        return nostroAccountId;
+    }
 }
