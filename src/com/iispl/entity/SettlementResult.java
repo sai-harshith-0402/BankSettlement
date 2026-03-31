@@ -12,7 +12,7 @@ public final class SettlementResult extends BaseEntity {
 	private final String batchId;
 	private final LocalDate batchDate;
 	private BatchStatus batchStatus;
-	private List<Transaction> transactions;
+	private List<Transaction> transactionsList;
 	private int totalTransactions;
 	private int settledCount;
 	private int failedCount;
@@ -23,7 +23,6 @@ public final class SettlementResult extends BaseEntity {
 	private LocalDateTime processedAt;
 
 	public SettlementResult(String batchId, LocalDate batchDate) {
-		super();
 		this.batchId = batchId;
 		this.batchDate = batchDate;
 		this.batchStatus = BatchStatus.RUNNING;
@@ -42,7 +41,7 @@ public final class SettlementResult extends BaseEntity {
 	}
 
 	public List<Transaction> getTransactions() {
-		return transactions;
+		return transactionsList;
 	}
 
 	public int getTotalTransactions() {
@@ -82,7 +81,7 @@ public final class SettlementResult extends BaseEntity {
 	}
 
 	public void setTransactions(List<Transaction> transactions) {
-		this.transactions = transactions;
+		this.transactionsList = transactions;
 	}
 
 	public void setTotalTransactions(int totalTransactions) {
