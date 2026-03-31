@@ -13,13 +13,32 @@ public final class IncomingTransaction extends BaseEntity {
 	private final BigDecimal amount;
 	private final LocalDateTime ingestTimestamp;
 	private ProcessingStatus processingStatus;
+	private SourceSystem sourceSystem;
 
-	public IncomingTransaction(Long sourceSystemId, TransactionType txnType, BigDecimal amount) {
+	public IncomingTransaction(Long sourceSystemId, TransactionType txnType, BigDecimal amount,
+			LocalDateTime ingestTimestamp, ProcessingStatus processingStatus, SourceSystem sourceSystem) {
 		this.sourceSystemId = sourceSystemId;
 		this.txnType = txnType;
 		this.amount = amount;
-		this.ingestTimestamp = LocalDateTime.now();
-		this.processingStatus = ProcessingStatus.RECEIVED;
+		this.ingestTimestamp = ingestTimestamp;
+		this.processingStatus = processingStatus;
+		this.sourceSystem = sourceSystem;
+	}
+
+	public ProcessingStatus getProcessingStatus() {
+		return processingStatus;
+	}
+
+	public void setProcessingStatus(ProcessingStatus processingStatus) {
+		this.processingStatus = processingStatus;
+	}
+
+	public SourceSystem getSourceSystem() {
+		return sourceSystem;
+	}
+
+	public void setSourceSystem(SourceSystem sourceSystem) {
+		this.sourceSystem = sourceSystem;
 	}
 
 	public Long getSourceSystemId() {
@@ -38,11 +57,4 @@ public final class IncomingTransaction extends BaseEntity {
 		return ingestTimestamp;
 	}
 
-	public ProcessingStatus getProcessingStatus() {
-		return processingStatus;
-	}
-
-	public void setProcessingStatus(ProcessingStatus processingStatus) {
-		this.processingStatus = processingStatus;
-	}
 }
