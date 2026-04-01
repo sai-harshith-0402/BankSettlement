@@ -22,7 +22,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class TransactionDaoImpl implements TransactionDao {
 
@@ -168,7 +167,7 @@ public class TransactionDaoImpl implements TransactionDao {
     // =========================================================================
 
     @Override
-    public Optional<Transaction> findById(long transactionId, Connection conn) {
+    public Transaction findById(long transactionId, Connection conn) {
         String sql = "SELECT t.id, t.source_system_id, t.channel, t.amount, t.txn_date, " +
                      "t.status, t.from_bank_id, t.to_bank_id, t.txn_subtype " +
                      "FROM transaction t WHERE t.id = ?";
@@ -177,13 +176,13 @@ public class TransactionDaoImpl implements TransactionDao {
             ps.setLong(1, transactionId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapBaseRow(rs, conn));
+                    return (mapBaseRow(rs, conn));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find transaction id=" + transactionId, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================

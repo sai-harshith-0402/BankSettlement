@@ -6,7 +6,6 @@ import com.iispl.enums.AccountType;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.util.List;
-import java.util.Optional;
 
 public interface AccountDao {
 
@@ -23,12 +22,12 @@ public interface AccountDao {
     /**
      * Finds an account by its generated id.
      */
-    Optional<Account> findById(long accountId, Connection conn);
+    Account findById(long accountId, Connection conn);
 
     /**
      * Finds an account by its account number (unique business key).
      */
-    Optional<Account> findByAccountNumber(String accountNumber, Connection conn);
+    Account findByAccountNumber(String accountNumber, Connection conn);
 
     /**
      * Returns all accounts belonging to a customer.

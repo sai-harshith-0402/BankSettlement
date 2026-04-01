@@ -9,7 +9,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Optional;
 
 public class CustomerDaoImpl implements CustomerDao {
 
@@ -65,7 +64,7 @@ public class CustomerDaoImpl implements CustomerDao {
     // =========================================================================
 
     @Override
-    public Optional<Customer> findById(long customerId, Connection conn) {
+    public Customer findById(long customerId, Connection conn) {
         String sql = "SELECT id, first_name, last_name, email, onboarding_date " +
                      "FROM customer WHERE id = ?";
 
@@ -73,13 +72,13 @@ public class CustomerDaoImpl implements CustomerDao {
             ps.setLong(1, customerId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find Customer id=" + customerId, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================
@@ -87,7 +86,7 @@ public class CustomerDaoImpl implements CustomerDao {
     // =========================================================================
 
     @Override
-    public Optional<Customer> findByEmail(String email, Connection conn) {
+    public Customer findByEmail(String email, Connection conn) {
         String sql = "SELECT id, first_name, last_name, email, onboarding_date " +
                      "FROM customer WHERE email = ?";
 
@@ -95,13 +94,13 @@ public class CustomerDaoImpl implements CustomerDao {
             ps.setString(1, email);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find Customer email=" + email, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================

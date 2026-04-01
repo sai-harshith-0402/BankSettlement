@@ -9,7 +9,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class BankDaoImpl implements BankDao {
 
@@ -45,20 +44,20 @@ public class BankDaoImpl implements BankDao {
     // =========================================================================
 
     @Override
-    public Optional<Bank> findById(long bankId, Connection conn) {
+    public Bank findById(long bankId, Connection conn) {
         String sql = "SELECT id, bank_code, bank_name, ifsc_code, is_active FROM bank WHERE id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, bankId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find Bank id=" + bankId, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================
@@ -66,20 +65,20 @@ public class BankDaoImpl implements BankDao {
     // =========================================================================
 
     @Override
-    public Optional<Bank> findByBankCode(String bankCode, Connection conn) {
+    public Bank findByBankCode(String bankCode, Connection conn) {
         String sql = "SELECT id, bank_code, bank_name, ifsc_code, is_active FROM bank WHERE bank_code = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, bankCode);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find Bank bankCode=" + bankCode, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================

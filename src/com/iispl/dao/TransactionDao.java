@@ -10,7 +10,6 @@ import com.iispl.enums.TransactionStatus;
 
 import java.sql.Connection;
 import java.util.List;
-import java.util.Optional;
 
 public interface TransactionDao {
 
@@ -44,7 +43,7 @@ public interface TransactionDao {
      * Fetches any transaction by its base-table id.
      * Returns empty if not found.
      */
-    Optional<Transaction> findById(long transactionId, Connection conn);
+    Transaction findById(long transactionId, Connection conn);
 
     /**
      * Returns all transactions belonging to a settlement batch.

@@ -6,7 +6,6 @@ import com.iispl.enums.BatchStatus;
 import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 public interface SettlementDao {
 
@@ -31,7 +30,7 @@ public interface SettlementDao {
     /**
      * Finds a SettlementResult by its generated DB id.
      */
-    Optional<SettlementResult> findById(long settlementId, Connection conn);
+    SettlementResult findById(long settlementId, Connection conn);
 
     /**
      * Returns all settlement batches for a given date.

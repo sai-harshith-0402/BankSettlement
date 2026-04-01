@@ -12,7 +12,6 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class AccountDaoImpl implements AccountDao {
 
@@ -71,7 +70,7 @@ public class AccountDaoImpl implements AccountDao {
     // =========================================================================
 
     @Override
-    public Optional<Account> findById(long accountId, Connection conn) {
+    public Account findById(long accountId, Connection conn) {
         String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status " +
                      "FROM account WHERE id = ?";
 
@@ -79,13 +78,13 @@ public class AccountDaoImpl implements AccountDao {
             ps.setLong(1, accountId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find Account id=" + accountId, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================
@@ -93,7 +92,7 @@ public class AccountDaoImpl implements AccountDao {
     // =========================================================================
 
     @Override
-    public Optional<Account> findByAccountNumber(String accountNumber, Connection conn) {
+    public Account findByAccountNumber(String accountNumber, Connection conn) {
         String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status " +
                      "FROM account WHERE account_number = ?";
 
@@ -101,13 +100,13 @@ public class AccountDaoImpl implements AccountDao {
             ps.setString(1, accountNumber);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find Account accountNumber=" + accountNumber, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================

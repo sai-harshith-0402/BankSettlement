@@ -13,7 +13,6 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 public class SettlementDaoImpl implements SettlementDao {
 
@@ -111,7 +110,7 @@ public class SettlementDaoImpl implements SettlementDao {
     // =========================================================================
 
     @Override
-    public Optional<SettlementResult> findById(long settlementId, Connection conn) {
+    public SettlementResult findById(long settlementId, Connection conn) {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at " +
@@ -121,13 +120,13 @@ public class SettlementDaoImpl implements SettlementDao {
             ps.setLong(1, settlementId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return Optional.of(mapRow(rs));
+                    return (mapRow(rs));
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("Failed to find SettlementResult id=" + settlementId, e);
         }
-        return Optional.empty();
+        return null;
     }
 
     // =========================================================================
