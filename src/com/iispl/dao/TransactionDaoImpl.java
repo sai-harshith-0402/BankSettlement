@@ -324,6 +324,7 @@ public class TransactionDaoImpl implements TransactionDao {
                     src, sourceSystemId, channel, fromBank, toBank,
                     amount, txnDate, status, fromBankId, toBankId, batchId,
                     rs.getLong("credit_account_id"));
+            
 
             case "DEBIT" -> new DebitTransaction(
                     id, createdLdt, updatedLdt,
