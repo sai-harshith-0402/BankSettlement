@@ -110,7 +110,7 @@ public class SettlementServiceImpl implements SettlementService {
         BigDecimal netAmount = applyNetting(settled);
 
         // --- POPULATE RESULT ---
-        result.setTransactions(settled);
+        result.setTransactionsList(settled);
         result.setSettledCount(settledCount);
         result.setFailedCount(failedCount);
         result.setTotalAmount(totalGross.setScale(2, RoundingMode.HALF_UP));

@@ -3,6 +3,7 @@ package com.iispl.entity;
 import com.iispl.enums.AccountType;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 public final class Account extends BaseEntity {
 
@@ -13,13 +14,17 @@ public final class Account extends BaseEntity {
 	private BigDecimal balance;
 	private String status;
 
-	public Account(String accountNumber, AccountType accountType, Long customerId, Long bankId, BigDecimal balance) {
+	
+	
+	public Account(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, String accountNumber,
+			AccountType accountType, Long customerId, Long bankId, BigDecimal balance, String status) {
+		super(id, createdAt, updatedAt);
 		this.accountNumber = accountNumber;
 		this.accountType = accountType;
 		this.customerId = customerId;
 		this.bankId = bankId;
 		this.balance = balance;
-		this.status = "ACTIVE";
+		this.status = status;
 	}
 
 	public String getAccountNumber() {

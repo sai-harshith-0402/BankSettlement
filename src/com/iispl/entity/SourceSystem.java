@@ -1,23 +1,21 @@
 package com.iispl.entity;
 
+import java.time.LocalDateTime;
+
 import com.iispl.enums.SourceType;
 
-public final class SourceSystem {
-
-	private final Long sourceId;
+public final class SourceSystem extends BaseEntity {
 	private final SourceType systemCode;
 	private final String filePath;
 	private final boolean isActive;
 
-	public SourceSystem(Long sourceId, SourceType systemCode, String filePath, boolean isActive) {
-		this.sourceId = sourceId;
+
+	public SourceSystem(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, SourceType systemCode,
+			String filePath, boolean isActive) {
+		super(id, createdAt, updatedAt);
 		this.systemCode = systemCode;
 		this.filePath = filePath;
 		this.isActive = isActive;
-	}
-
-	public Long getSourceId() {
-		return sourceId;
 	}
 
 	public SourceType getSystemCode() {

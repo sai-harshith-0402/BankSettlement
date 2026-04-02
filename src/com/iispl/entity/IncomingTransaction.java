@@ -14,15 +14,21 @@ public final class IncomingTransaction extends BaseEntity {
 	private final LocalDateTime ingestTimestamp;
 	private ProcessingStatus processingStatus;
 	private SourceSystem sourceSystem;
+	private String batchId;
 
-	public IncomingTransaction(Long sourceSystemId, TransactionType txnType, BigDecimal amount,
-			LocalDateTime ingestTimestamp, ProcessingStatus processingStatus, SourceSystem sourceSystem) {
+	
+
+	public IncomingTransaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, Long sourceSystemId,
+			TransactionType txnType, BigDecimal amount, LocalDateTime ingestTimestamp,
+			ProcessingStatus processingStatus, SourceSystem sourceSystem, String batchId) {
+		super(id, createdAt, updatedAt);
 		this.sourceSystemId = sourceSystemId;
 		this.txnType = txnType;
 		this.amount = amount;
 		this.ingestTimestamp = ingestTimestamp;
 		this.processingStatus = processingStatus;
 		this.sourceSystem = sourceSystem;
+		this.batchId = batchId;
 	}
 
 	public ProcessingStatus getProcessingStatus() {
@@ -55,6 +61,14 @@ public final class IncomingTransaction extends BaseEntity {
 
 	public LocalDateTime getIngestTimestamp() {
 		return ingestTimestamp;
+	}
+
+	public String getBatchId() {
+		return batchId;
+	}
+
+	public void setBatchId(String batchId) {
+		this.batchId = batchId;
 	}
 
 }

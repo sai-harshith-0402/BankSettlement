@@ -4,7 +4,7 @@ import com.iispl.enums.AuditAction;
 
 import java.time.LocalDateTime;
 
-public final class AuditLog {
+public final class AuditLog extends BaseEntity {
 
 	private final String entityType;
 	private final Long entityId;
@@ -12,12 +12,14 @@ public final class AuditLog {
 	private final String changedBy;
 	private final LocalDateTime changedAt;
 
-	public AuditLog(String entityType, Long entityId, AuditAction action, String changedBy) {
+	public AuditLog(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, String entityType, Long entityId,
+			AuditAction action, String changedBy, LocalDateTime changedAt) {
+		super(id, createdAt, updatedAt);
 		this.entityType = entityType;
 		this.entityId = entityId;
 		this.action = action;
 		this.changedBy = changedBy;
-		this.changedAt = LocalDateTime.now();
+		this.changedAt = changedAt;
 	}
 
 	public String getEntityType() {

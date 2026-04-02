@@ -8,9 +8,10 @@ public abstract class BaseEntity {
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 
-	public BaseEntity() {
-		this.createdAt = LocalDateTime.now();
-		this.updatedAt = LocalDateTime.now();
+	public BaseEntity(Long id, LocalDateTime createdAt, LocalDateTime updatedAt) {
+		this.id = id;
+		this.createdAt = createdAt;
+		this.updatedAt = updatedAt;
 	}
 
 	public Long getId() {

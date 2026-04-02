@@ -18,9 +18,14 @@ public abstract class Transaction extends BaseEntity {
 	private TransactionStatus status;
 	private long fromBankId;
 	private long toBankId;
+	private String settlementBatchId;
 
-	public Transaction(SourceSystem sourceSystem, long sourceSystemId, ChannelType channel, Bank fromBank, Bank toBank,
-			BigDecimal amount, LocalDateTime txnDate, TransactionStatus status, long fromBankId, long toBankId) {
+	
+
+	public Transaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, SourceSystem sourceSystem,
+			long sourceSystemId, ChannelType channel, Bank fromBank, Bank toBank, BigDecimal amount,
+			LocalDateTime txnDate, TransactionStatus status, long fromBankId, long toBankId, String settlementBatchId) {
+		super(id, createdAt, updatedAt);
 		this.sourceSystem = sourceSystem;
 		this.sourceSystemId = sourceSystemId;
 		this.channel = channel;
@@ -31,6 +36,7 @@ public abstract class Transaction extends BaseEntity {
 		this.status = status;
 		this.fromBankId = fromBankId;
 		this.toBankId = toBankId;
+		this.settlementBatchId = settlementBatchId;
 	}
 
 	public SourceSystem getSourceSystem() {
@@ -111,6 +117,14 @@ public abstract class Transaction extends BaseEntity {
 
 	public void setToBankId(long toBankId) {
 		this.toBankId = toBankId;
+	}
+
+	public String getSettlementBatchId() {
+		return settlementBatchId;
+	}
+
+	public void setSettlementBatchId(String settlementBatchId) {
+		this.settlementBatchId = settlementBatchId;
 	}
 
 }

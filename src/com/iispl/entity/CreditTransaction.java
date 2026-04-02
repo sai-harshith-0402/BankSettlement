@@ -10,14 +10,18 @@ public final class CreditTransaction extends Transaction {
 
     private final long creditAccountId;
 
-	public CreditTransaction(SourceSystem sourceSystem, long sourceSystemId, ChannelType channel, Bank fromBank,
-			Bank toBank, BigDecimal amount, LocalDateTime txnDate, TransactionStatus status, long fromBankId,
-			long toBankId, long creditAccountId) {
-		super(sourceSystem, sourceSystemId, channel, fromBank, toBank, amount, txnDate, status, fromBankId, toBankId);
+	
+    public CreditTransaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, SourceSystem sourceSystem,
+			long sourceSystemId, ChannelType channel, Bank fromBank, Bank toBank, BigDecimal amount,
+			LocalDateTime txnDate, TransactionStatus status, long fromBankId, long toBankId, String settlementBatchId,
+			long creditAccountId) {
+		super(id, createdAt, updatedAt, sourceSystem, sourceSystemId, channel, fromBank, toBank, amount, txnDate,
+				status, fromBankId, toBankId, settlementBatchId);
 		this.creditAccountId = creditAccountId;
 	}
 
-    public Long getCreditAccountId() {
+
+	public Long getCreditAccountId() {
         return creditAccountId;
     }
 }

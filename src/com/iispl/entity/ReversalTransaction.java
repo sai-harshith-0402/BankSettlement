@@ -12,15 +12,19 @@ public final class ReversalTransaction extends Transaction {
     private final String reversalReason;
 
 
-	public ReversalTransaction(SourceSystem sourceSystem, long sourceSystemId, ChannelType channel, Bank fromBank,
-			Bank toBank, BigDecimal amount, LocalDateTime txnDate, TransactionStatus status, long fromBankId,
-			long toBankId, long originalTransactionId, String reversalReason) {
-		super(sourceSystem, sourceSystemId, channel, fromBank, toBank, amount, txnDate, status, fromBankId, toBankId);
+	
+
+    public ReversalTransaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, SourceSystem sourceSystem,
+			long sourceSystemId, ChannelType channel, Bank fromBank, Bank toBank, BigDecimal amount,
+			LocalDateTime txnDate, TransactionStatus status, long fromBankId, long toBankId, String settlementBatchId,
+			Long originalTransactionId, String reversalReason) {
+		super(id, createdAt, updatedAt, sourceSystem, sourceSystemId, channel, fromBank, toBank, amount, txnDate,
+				status, fromBankId, toBankId, settlementBatchId);
 		this.originalTransactionId = originalTransactionId;
 		this.reversalReason = reversalReason;
 	}
 
-    public Long getOriginalTransactionId() {
+	public Long getOriginalTransactionId() {
         return originalTransactionId;
     }
 

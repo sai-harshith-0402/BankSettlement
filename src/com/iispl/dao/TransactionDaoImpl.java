@@ -32,8 +32,8 @@ public class TransactionDaoImpl implements TransactionDao {
     @Override
     public long saveIncoming(IncomingTransaction txn, Connection conn) {
         String sql = "INSERT INTO incoming_transaction " +
-                     "(source_system_id, txn_type, amount, ingest_timestamp, processing_status, created_at, updated_at) " +
-                     "VALUES (?, ?, ?, ?, ?, NOW(), NOW())";
+                     "(source_system_id, txn_type, amount, ingest_timestamp, processing_status, settlement_batch_id, created_at, updated_at) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setLong(1, txn.getSourceSystemId());
@@ -41,6 +41,11 @@ public class TransactionDaoImpl implements TransactionDao {
             ps.setBigDecimal(3, txn.getAmount());
             ps.setTimestamp(4, Timestamp.valueOf(txn.getIngestTimestamp()));
             ps.setString(5, txn.getProcessingStatus().name());
+            if (txn.getBatchId() != null) {
+                ps.setLong(6, Long.parseLong(txn.getBatchId()));
+            } else {
+                ps.setNull(6, java.sql.Types.BIGINT);
+            }
             ps.executeUpdate();
 
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -75,17 +80,7 @@ public class TransactionDaoImpl implements TransactionDao {
 
     @Override
     public long saveCreditTransaction(CreditTransaction txn, Connection conn) {
-        long baseId = saveBaseTransaction(txn, conn);
-
-        String sql = "INSERT INTO credit_transaction (id, credit_account_id) VALUES (?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, baseId);
-            ps.setLong(2, txn.getCreditAccountId());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to save CreditTransaction subtype row id=" + baseId, e);
-        }
-        return baseId;
+        return saveBaseTransaction(txn, conn);
     }
 
     // =========================================================================
@@ -94,17 +89,7 @@ public class TransactionDaoImpl implements TransactionDao {
 
     @Override
     public long saveDebitTransaction(DebitTransaction txn, Connection conn) {
-        long baseId = saveBaseTransaction(txn, conn);
-
-        String sql = "INSERT INTO debit_transaction (id, debit_account_id) VALUES (?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, baseId);
-            ps.setLong(2, txn.getDebitAccountId());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to save DebitTransaction subtype row id=" + baseId, e);
-        }
-        return baseId;
+        return saveBaseTransaction(txn, conn);
     }
 
     // =========================================================================
@@ -113,17 +98,7 @@ public class TransactionDaoImpl implements TransactionDao {
 
     @Override
     public long saveInterBankTransaction(InterBankTransaction txn, Connection conn) {
-        long baseId = saveBaseTransaction(txn, conn);
-
-        String sql = "INSERT INTO inter_bank_transaction (id, nostro_account_id) VALUES (?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, baseId);
-            ps.setLong(2, txn.getNostroAccountId());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to save InterBankTransaction subtype row id=" + baseId, e);
-        }
-        return baseId;
+        return saveBaseTransaction(txn, conn);
     }
 
     // =========================================================================
@@ -132,18 +107,7 @@ public class TransactionDaoImpl implements TransactionDao {
 
     @Override
     public long saveReversalTransaction(ReversalTransaction txn, Connection conn) {
-        long baseId = saveBaseTransaction(txn, conn);
-
-        String sql = "INSERT INTO reversal_transaction (id, original_transaction_id, reversal_reason) VALUES (?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, baseId);
-            ps.setLong(2, txn.getOriginalTransactionId());
-            ps.setString(3, txn.getReversalReason());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to save ReversalTransaction subtype row id=" + baseId, e);
-        }
-        return baseId;
+        return saveBaseTransaction(txn, conn);
     }
 
     // =========================================================================
@@ -152,7 +116,7 @@ public class TransactionDaoImpl implements TransactionDao {
 
     @Override
     public void updateTransactionStatus(long transactionId, TransactionStatus status, Connection conn) {
-        String sql = "UPDATE transaction SET status = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE settlement_transaction SET status = ?, updated_at = NOW() WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setLong(2, transactionId);
@@ -169,8 +133,10 @@ public class TransactionDaoImpl implements TransactionDao {
     @Override
     public Transaction findById(long transactionId, Connection conn) {
         String sql = "SELECT t.id, t.source_system_id, t.channel, t.amount, t.txn_date, " +
-                     "t.status, t.from_bank_id, t.to_bank_id, t.txn_subtype " +
-                     "FROM transaction t WHERE t.id = ?";
+                     "t.status, t.from_bank_id, t.to_bank_id, t.txn_subtype, t.settlement_batch_id, " +
+                     "t.credit_account_id, t.debit_account_id, t.nostro_account_id, " +
+                     "t.original_transaction_id, t.reversal_reason " +
+                     "FROM settlement_transaction t WHERE t.id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, transactionId);
@@ -192,10 +158,11 @@ public class TransactionDaoImpl implements TransactionDao {
     @Override
     public List<Transaction> findByBatchId(long batchId, Connection conn) {
         String sql = "SELECT t.id, t.source_system_id, t.channel, t.amount, t.txn_date, " +
-                     "t.status, t.from_bank_id, t.to_bank_id, t.txn_subtype " +
-                     "FROM transaction t " +
-                     "JOIN settlement_batch_transaction sbt ON sbt.transaction_id = t.id " +
-                     "WHERE sbt.batch_id = ?";
+                     "t.status, t.from_bank_id, t.to_bank_id, t.txn_subtype, t.settlement_batch_id, " +
+                     "t.credit_account_id, t.debit_account_id, t.nostro_account_id, " +
+                     "t.original_transaction_id, t.reversal_reason " +
+                     "FROM settlement_transaction t " +
+                     "WHERE t.settlement_batch_id = ?";
 
         List<Transaction> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -220,20 +187,64 @@ public class TransactionDaoImpl implements TransactionDao {
      * Called by every saveXxx method before inserting the subtype row.
      */
     private long saveBaseTransaction(Transaction txn, Connection conn) {
-        String sql = "INSERT INTO transaction " +
-                     "(source_system_id, channel, from_bank_id, to_bank_id, amount, txn_date, " +
-                     " status, txn_subtype, created_at, updated_at) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        String sql = "INSERT INTO settlement_transaction " +
+                     "(source_system_id, source_system_ref_id, channel, from_bank_id, to_bank_id, amount, txn_date, " +
+                     " status, txn_subtype, settlement_batch_id, " +
+                     " credit_account_id, debit_account_id, nostro_account_id, " +
+                     " original_transaction_id, reversal_reason, created_at, updated_at) " +
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setLong(1, txn.getSourceSystemId());
-            ps.setString(2, txn.getChannel() != null ? txn.getChannel().name() : null);
-            ps.setLong(3, txn.getFromBankId());
-            ps.setLong(4, txn.getToBankId());
-            ps.setBigDecimal(5, txn.getAmount());
-            ps.setTimestamp(6, Timestamp.valueOf(txn.getTxnDate()));
-            ps.setString(7, txn.getStatus() != null ? txn.getStatus().name() : null);
-            ps.setString(8, txn.getClass().getSimpleName());
+            ps.setLong(2, txn.getSourceSystemId());
+            ps.setString(3, txn.getChannel() != null ? txn.getChannel().name() : null);
+            ps.setLong(4, txn.getFromBankId());
+            ps.setLong(5, txn.getToBankId());
+            ps.setBigDecimal(6, txn.getAmount());
+            ps.setTimestamp(7, Timestamp.valueOf(txn.getTxnDate()));
+            ps.setString(8, txn.getStatus() != null ? txn.getStatus().name() : null);
+            ps.setString(9, txn.getClass().getSimpleName());
+
+            // settlement_batch_id
+            if (txn.getSettlementBatchId() != null) {
+                ps.setLong(10, Long.parseLong(txn.getSettlementBatchId()));
+            } else {
+                ps.setNull(10, java.sql.Types.BIGINT);
+            }
+
+            // subtype-specific columns — null unless applicable
+            if (txn instanceof CreditTransaction ct) {
+                ps.setLong(11, ct.getCreditAccountId());
+                ps.setNull(12, java.sql.Types.BIGINT);
+                ps.setNull(13, java.sql.Types.BIGINT);
+                ps.setNull(14, java.sql.Types.BIGINT);
+                ps.setNull(15, java.sql.Types.VARCHAR);
+            } else if (txn instanceof DebitTransaction dt) {
+                ps.setNull(11, java.sql.Types.BIGINT);
+                ps.setLong(12, dt.getDebitAccountId());
+                ps.setNull(13, java.sql.Types.BIGINT);
+                ps.setNull(14, java.sql.Types.BIGINT);
+                ps.setNull(15, java.sql.Types.VARCHAR);
+            } else if (txn instanceof InterBankTransaction it) {
+                ps.setNull(11, java.sql.Types.BIGINT);
+                ps.setNull(12, java.sql.Types.BIGINT);
+                ps.setLong(13, it.getNostroAccountId());
+                ps.setNull(14, java.sql.Types.BIGINT);
+                ps.setNull(15, java.sql.Types.VARCHAR);
+            } else if (txn instanceof ReversalTransaction rt) {
+                ps.setNull(11, java.sql.Types.BIGINT);
+                ps.setNull(12, java.sql.Types.BIGINT);
+                ps.setNull(13, java.sql.Types.BIGINT);
+                ps.setLong(14, rt.getOriginalTransactionId());
+                ps.setString(15, rt.getReversalReason());
+            } else {
+                ps.setNull(11, java.sql.Types.BIGINT);
+                ps.setNull(12, java.sql.Types.BIGINT);
+                ps.setNull(13, java.sql.Types.BIGINT);
+                ps.setNull(14, java.sql.Types.BIGINT);
+                ps.setNull(15, java.sql.Types.VARCHAR);
+            }
+
             ps.executeUpdate();
 
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -261,92 +272,41 @@ public class TransactionDaoImpl implements TransactionDao {
         String channelStr     = rs.getString("channel");
         long   fromBankId     = rs.getLong("from_bank_id");
         long   toBankId       = rs.getLong("to_bank_id");
-        String amountStr      = rs.getString("amount");
+        java.math.BigDecimal amount = rs.getBigDecimal("amount");
         Timestamp txnDate     = rs.getTimestamp("txn_date");
         String statusStr      = rs.getString("status");
         String subtype        = rs.getString("txn_subtype");
 
         // Lightweight placeholder objects — full hydration done by service if needed
-        SourceSystem src = new SourceSystem(sourceSystemId, SourceType.INTERNAL, null, true);
-        Bank fromBank    = new Bank(String.valueOf(fromBankId), "Bank " + fromBankId, null, true);
-        Bank toBank      = new Bank(String.valueOf(toBankId),   "Bank " + toBankId,   null, true);
+        SourceSystem src = new SourceSystem(SourceType.INTERNAL, null, true);
+        src.setId(sourceSystemId);
+        Bank fromBank = new Bank(String.valueOf(fromBankId), "Bank " + fromBankId, null, true);
+        Bank toBank   = new Bank(String.valueOf(toBankId),   "Bank " + toBankId,   null, true);
 
         ChannelType channel = channelStr != null
                 ? ChannelType.valueOf(channelStr) : ChannelType.INTERNAL;
         TransactionStatus status = statusStr != null
                 ? TransactionStatus.valueOf(statusStr) : TransactionStatus.INITIATED;
-        java.math.BigDecimal amount = new java.math.BigDecimal(amountStr != null ? amountStr : "0");
-        java.time.LocalDateTime ldt = txnDate != null ? txnDate.toLocalDateTime() : java.time.LocalDateTime.now();
+        java.time.LocalDateTime ldt = txnDate != null
+                ? txnDate.toLocalDateTime() : java.time.LocalDateTime.now();
 
         Transaction txn = switch (subtype != null ? subtype : "") {
-            case "CreditTransaction" -> {
-                long creditAccId = fetchCreditAccountId(id, conn);
-                yield new CreditTransaction(src, sourceSystemId, channel,
-                        fromBank, toBank, amount, ldt, status, fromBankId, toBankId, creditAccId);
-            }
-            case "DebitTransaction" -> {
-                long debitAccId = fetchDebitAccountId(id, conn);
-                yield new DebitTransaction(src, sourceSystemId, channel,
-                        fromBank, toBank, amount, ldt, status, fromBankId, toBankId, debitAccId);
-            }
-            case "ReversalTransaction" -> {
-                Object[] rev = fetchReversalFields(id, conn);
-                yield new ReversalTransaction(src, sourceSystemId, channel,
-                        fromBank, toBank, amount, ldt, status, fromBankId, toBankId,
-                        (long) rev[0], (String) rev[1]);
-            }
-            default -> {
-                long nostroAccId = fetchNostroAccountId(id, conn);
-                yield new InterBankTransaction(src, sourceSystemId, channel,
-                        fromBank, toBank, amount, ldt, status, fromBankId, toBankId, nostroAccId);
-            }
+            case "CreditTransaction" -> new CreditTransaction(
+                    src, sourceSystemId, channel, fromBank, toBank, amount, ldt, status,
+                    fromBankId, toBankId, rs.getLong("credit_account_id"));
+            case "DebitTransaction" -> new DebitTransaction(
+                    src, sourceSystemId, channel, fromBank, toBank, amount, ldt, status,
+                    fromBankId, toBankId, rs.getLong("debit_account_id"));
+            case "ReversalTransaction" -> new ReversalTransaction(
+                    src, sourceSystemId, channel, fromBank, toBank, amount, ldt, status,
+                    fromBankId, toBankId,
+                    rs.getLong("original_transaction_id"), rs.getString("reversal_reason"));
+            default -> new InterBankTransaction(
+                    src, sourceSystemId, channel, fromBank, toBank, amount, ldt, status,
+                    fromBankId, toBankId, rs.getLong("nostro_account_id"));
         };
 
         txn.setId(id);
         return txn;
-    }
-
-    private long fetchCreditAccountId(long txnId, Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT credit_account_id FROM credit_transaction WHERE id = ?")) {
-            ps.setLong(1, txnId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getLong("credit_account_id") : 0L;
-            }
-        }
-    }
-
-    private long fetchDebitAccountId(long txnId, Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT debit_account_id FROM debit_transaction WHERE id = ?")) {
-            ps.setLong(1, txnId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getLong("debit_account_id") : 0L;
-            }
-        }
-    }
-
-    private long fetchNostroAccountId(long txnId, Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT nostro_account_id FROM inter_bank_transaction WHERE id = ?")) {
-            ps.setLong(1, txnId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getLong("nostro_account_id") : 0L;
-            }
-        }
-    }
-
-    private Object[] fetchReversalFields(long txnId, Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT original_transaction_id, reversal_reason FROM reversal_transaction WHERE id = ?")) {
-            ps.setLong(1, txnId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new Object[]{ rs.getLong("original_transaction_id"),
-                                         rs.getString("reversal_reason") };
-                }
-            }
-        }
-        return new Object[]{ 0L, "" };
     }
 }

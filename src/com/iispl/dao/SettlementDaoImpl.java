@@ -22,7 +22,7 @@ public class SettlementDaoImpl implements SettlementDao {
 
     @Override
     public long save(SettlementResult result, Connection conn) {
-        String sql = "INSERT INTO settlement_result " +
+        String sql = "INSERT INTO settlement_batch " +
                      "(batch_id, batch_date, batch_status, total_transactions, " +
                      " settled_count, failed_count, total_amount, settled_amount, " +
                      " net_amount, exported_file_path, processed_at, created_at, updated_at) " +
@@ -63,7 +63,7 @@ public class SettlementDaoImpl implements SettlementDao {
 
     @Override
     public void update(SettlementResult result, Connection conn) {
-        String sql = "UPDATE settlement_result SET " +
+        String sql = "UPDATE settlement_batch SET " +
                      "batch_status = ?, total_transactions = ?, settled_count = ?, " +
                      "failed_count = ?, total_amount = ?, settled_amount = ?, " +
                      "net_amount = ?, exported_file_path = ?, processed_at = ?, updated_at = NOW() " +
@@ -94,7 +94,7 @@ public class SettlementDaoImpl implements SettlementDao {
 
     @Override
     public void updateStatus(long settlementId, BatchStatus status, Connection conn) {
-        String sql = "UPDATE settlement_result SET batch_status = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE settlement_batch SET batch_status = ?, updated_at = NOW() WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setLong(2, settlementId);
@@ -114,7 +114,7 @@ public class SettlementDaoImpl implements SettlementDao {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at " +
-                     "FROM settlement_result WHERE id = ?";
+                     "FROM settlement_batch WHERE id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, settlementId);
@@ -138,7 +138,7 @@ public class SettlementDaoImpl implements SettlementDao {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at " +
-                     "FROM settlement_result WHERE batch_date = ? ORDER BY id";
+                     "FROM settlement_batch WHERE batch_date = ? ORDER BY id";
 
         List<SettlementResult> results = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -163,7 +163,7 @@ public class SettlementDaoImpl implements SettlementDao {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at " +
-                     "FROM settlement_result WHERE batch_status = ? ORDER BY batch_date DESC";
+                     "FROM settlement_batch WHERE batch_status = ? ORDER BY batch_date DESC";
 
         List<SettlementResult> results = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {

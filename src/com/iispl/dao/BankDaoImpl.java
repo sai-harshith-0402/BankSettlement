@@ -29,7 +29,9 @@ public class BankDaoImpl implements BankDao {
 
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
-                    return rs.getLong(1);
+                    long id = rs.getLong(1);
+                    bank.setId(id);
+                    return id;
                 }
             }
         } catch (SQLException e) {
@@ -107,11 +109,13 @@ public class BankDaoImpl implements BankDao {
     // =========================================================================
 
     private Bank mapRow(ResultSet rs) throws SQLException {
-        return new Bank(
+        Bank bank = new Bank(
                 rs.getString("bank_code"),
                 rs.getString("bank_name"),
                 rs.getString("ifsc_code"),
                 rs.getBoolean("is_active")
         );
+        bank.setId(rs.getLong("id"));
+        return bank;
     }
 }

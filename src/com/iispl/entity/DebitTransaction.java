@@ -10,10 +10,12 @@ public final class DebitTransaction extends Transaction {
 
 	private final long debitAccountId;
 
-	public DebitTransaction(SourceSystem sourceSystem, long sourceSystemId, ChannelType channel, Bank fromBank,
-			Bank toBank, BigDecimal amount, LocalDateTime txnDate, TransactionStatus status, long fromBankId,
-			long toBankId, long debitAccountId) {
-		super(sourceSystem, sourceSystemId, channel, fromBank, toBank, amount, txnDate, status, fromBankId, toBankId);
+	public DebitTransaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, SourceSystem sourceSystem,
+			long sourceSystemId, ChannelType channel, Bank fromBank, Bank toBank, BigDecimal amount,
+			LocalDateTime txnDate, TransactionStatus status, long fromBankId, long toBankId, String settlementBatchId,
+			long debitAccountId) {
+		super(id, createdAt, updatedAt, sourceSystem, sourceSystemId, channel, fromBank, toBank, amount, txnDate,
+				status, fromBankId, toBankId, settlementBatchId);
 		this.debitAccountId = debitAccountId;
 	}
 

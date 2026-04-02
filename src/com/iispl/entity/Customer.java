@@ -1,6 +1,7 @@
 package com.iispl.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public final class Customer extends BaseEntity {
@@ -10,9 +11,12 @@ public final class Customer extends BaseEntity {
 	private final String email;
 	private final LocalDate onboardingDate;
 	private final List<Account> accountList;
-
-	public Customer(String firstName, String lastName, String email, LocalDate onboardingDate,
-			List<Account> accountList) {
+	
+	
+	
+	public Customer(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, String firstName, String lastName,
+			String email, LocalDate onboardingDate, List<Account> accountList) {
+		super(id, createdAt, updatedAt);
 		this.firstName = firstName;
 		this.lastName = lastName;
 		this.email = email;
