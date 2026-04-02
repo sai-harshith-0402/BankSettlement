@@ -45,13 +45,18 @@ public class NeftUpiAdapter implements TransactionAdapter {
             String accountNumber = AdapterUtil.readString(row.getCell(4));
             String upiId         = AdapterUtil.readString(row.getCell(5)); // optional — null if absent
 
+            // FIX: same constructor fix as CbsAdapter — full 10-arg form.
             return new IncomingTransaction(
+                    null,
+                    null,
+                    null,
                     sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),
                     ProcessingStatus.RECEIVED,
-                    sourceSystem
+                    sourceSystem,
+                    null
             );
 
         } catch (AdapterException e) {

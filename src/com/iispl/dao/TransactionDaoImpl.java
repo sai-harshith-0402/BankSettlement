@@ -105,9 +105,12 @@ public class TransactionDaoImpl implements TransactionDao {
     // UPDATE STATUS
     // =========================================================================
 
+    // FIX: Table was "settlement_transaction" — corrected to "transaction"
+    //      to match the schema. settlement_transaction is the join table,
+    //      not the main transaction table.
     @Override
     public void updateTransactionStatus(long transactionId, TransactionStatus status, Connection conn) {
-        String sql = "UPDATE settlement_transaction SET status = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE transaction SET status = ?, updated_at = NOW() WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setLong(2, transactionId);
@@ -121,13 +124,16 @@ public class TransactionDaoImpl implements TransactionDao {
     // FIND BY ID
     // =========================================================================
 
+    // FIX: Table was "settlement_transaction" — corrected to "transaction".
+    //      Added created_at, updated_at, account_id to SELECT.
+    //      txn_type replaces txn_subtype as the discriminator column name (matches schema).
     @Override
     public Transaction findById(long transactionId, Connection conn) {
         String sql = "SELECT id, source_system_id, channel, amount, txn_date, status, " +
-                     "from_bank_id, to_bank_id, txn_subtype, settlement_batch_id, " +
+                     "from_bank_id, to_bank_id, txn_type, settlement_batch_id, account_id, " +
                      "credit_account_id, debit_account_id, nostro_account_id, " +
                      "original_transaction_id, reversal_reason, created_at, updated_at " +
-                     "FROM settlement_transaction WHERE id = ?";
+                     "FROM transaction WHERE id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, transactionId);
@@ -146,14 +152,18 @@ public class TransactionDaoImpl implements TransactionDao {
     // FIND BY BATCH
     // =========================================================================
 
+    // FIX: Table corrected to "transaction"; join with settlement_transaction
+    //      to filter by batch. settlement_batch_id stored as VARCHAR on transaction
+    //      row to match entity field type (String settlementBatchId).
     @Override
     public List<Transaction> findByBatchId(long batchId, Connection conn) {
         String sql = "SELECT t.id, t.source_system_id, t.channel, t.amount, t.txn_date, t.status, " +
-                     "t.from_bank_id, t.to_bank_id, t.txn_subtype, t.settlement_batch_id, " +
+                     "t.from_bank_id, t.to_bank_id, t.txn_type, t.settlement_batch_id, t.account_id, " +
                      "t.credit_account_id, t.debit_account_id, t.nostro_account_id, " +
                      "t.original_transaction_id, t.reversal_reason, t.created_at, t.updated_at " +
-                     "FROM settlement_transaction t " +
-                     "WHERE t.settlement_batch_id = ?";
+                     "FROM transaction t " +
+                     "INNER JOIN settlement_transaction st ON st.transaction_id = t.id " +
+                     "WHERE st.settlement_id = ?";
 
         List<Transaction> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -267,6 +277,18 @@ public class TransactionDaoImpl implements TransactionDao {
         throw new IllegalArgumentException("Unknown transaction subtype: " + txn.getClass());
     }
 
+    // FIX: All entity constructors updated to full-arg form matching new entities.
+    //      SourceSystem(Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //                   SourceType systemCode, String filePath, boolean isActive)
+    //      Bank(Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //           String bankCode, String bankName, String ifscCode, boolean isActive)
+    //      CreditTransaction / DebitTransaction / InterBankTransaction / ReversalTransaction
+    //      all require (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //                   SourceSystem, long sourceSystemId, ChannelType, Bank fromBank,
+    //                   Bank toBank, BigDecimal amount, LocalDateTime txnDate,
+    //                   TransactionStatus status, long fromBankId, long toBankId,
+    //                   String settlementBatchId, <subtype-specific args>)
+    //      txn_subtype column renamed to txn_type in SELECT to match schema.
     private Transaction mapBaseRow(ResultSet rs) throws SQLException {
         long         id             = rs.getLong("id");
         long         sourceSystemId = rs.getLong("source_system_id");
@@ -276,7 +298,8 @@ public class TransactionDaoImpl implements TransactionDao {
         BigDecimal   amount         = rs.getBigDecimal("amount");
         Timestamp    txnTs          = rs.getTimestamp("txn_date");
         String       statusStr      = rs.getString("status");
-        String       subtype        = rs.getString("txn_subtype");   // schema column: txn_subtype
+        String       txnType        = rs.getString("txn_type");
+        String       batchId        = rs.getString("settlement_batch_id");
         Timestamp    createdAt      = rs.getTimestamp("created_at");
         Timestamp    updatedAt      = rs.getTimestamp("updated_at");
 
@@ -284,52 +307,44 @@ public class TransactionDaoImpl implements TransactionDao {
         LocalDateTime updatedLdt = updatedAt != null ? updatedAt.toLocalDateTime() : null;
         LocalDateTime txnDate    = txnTs     != null ? txnTs.toLocalDateTime()     : LocalDateTime.now();
 
-        // Lightweight placeholder objects — use actual constructors + BaseEntity setters
-        SourceSystem src = new SourceSystem(SourceType.CBS, null, true);
-        src.setId(sourceSystemId);
-        src.setCreatedAt(createdLdt);
-        src.setUpdatedAt(updatedLdt);
+        // Lightweight placeholder objects — fully hydrated by service layer when needed
+        SourceSystem src = new SourceSystem(
+                sourceSystemId, createdLdt, updatedLdt, SourceType.CBS, null, true);
+        Bank fromBank = new Bank(
+                fromBankId, null, null, String.valueOf(fromBankId), "Bank " + fromBankId, null, true);
+        Bank toBank = new Bank(
+                toBankId,   null, null, String.valueOf(toBankId),   "Bank " + toBankId,   null, true);
 
-        Bank fromBank = new Bank(String.valueOf(fromBankId), "Bank " + fromBankId, null, true);
-        fromBank.setId(fromBankId);
+        ChannelType       channel = channelStr != null ? ChannelType.valueOf(channelStr)           : null;
+        TransactionStatus status  = statusStr  != null ? TransactionStatus.valueOf(statusStr)      : null;
 
-        Bank toBank = new Bank(String.valueOf(toBankId), "Bank " + toBankId, null, true);
-        toBank.setId(toBankId);
-
-        ChannelType       channel = channelStr != null ? ChannelType.valueOf(channelStr)      : ChannelType.INTERNAL;
-        TransactionStatus status  = statusStr  != null ? TransactionStatus.valueOf(statusStr) : TransactionStatus.INITIATED;
-
-        // settlement_batch_id is BIGINT in DB — read as long, convert to String for entity
-        long   batchIdLong = rs.getLong("settlement_batch_id");
-        String batchId     = rs.wasNull() ? null : String.valueOf(batchIdLong);
-
-        Transaction txn = switch (subtype != null ? subtype : "") {
-            case "CreditTransaction" -> new CreditTransaction(
+        Transaction txn = switch (txnType != null ? txnType : "") {
+            case "CREDIT" -> new CreditTransaction(
+                    id, createdLdt, updatedLdt,
                     src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
+                    amount, txnDate, status, fromBankId, toBankId, batchId,
                     rs.getLong("credit_account_id"));
 
-            case "DebitTransaction" -> new DebitTransaction(
+            case "DEBIT" -> new DebitTransaction(
+                    id, createdLdt, updatedLdt,
                     src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
+                    amount, txnDate, status, fromBankId, toBankId, batchId,
                     rs.getLong("debit_account_id"));
 
-            case "ReversalTransaction" -> new ReversalTransaction(
+            case "REVERSAL" -> new ReversalTransaction(
+                    id, createdLdt, updatedLdt,
                     src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
+                    amount, txnDate, status, fromBankId, toBankId, batchId,
                     rs.getLong("original_transaction_id"),
                     rs.getString("reversal_reason"));
 
             default -> new InterBankTransaction(
+                    id, createdLdt, updatedLdt,
                     src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
+                    amount, txnDate, status, fromBankId, toBankId, batchId,
                     rs.getLong("nostro_account_id"));
         };
 
-        txn.setId(id);
-        txn.setSettlementBatchId(batchId);
-        txn.setCreatedAt(createdLdt);
-        txn.setUpdatedAt(updatedLdt);
         return txn;
     }
 }

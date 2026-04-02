@@ -108,13 +108,19 @@ public class CustomerDaoImpl implements CustomerDao {
     // PRIVATE HELPER
     // =========================================================================
 
-    // FIX: Customer only has 5-arg constructor (firstName, lastName, email, onboardingDate, accountList).
-    //      id, createdAt, updatedAt come from BaseEntity setters.
+    // FIX: Old code called new Customer(firstName, lastName, email, date, list) —
+    //      a 5-arg constructor that no longer exists.
+    //      Customer now requires (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //      String firstName, String lastName, String email, LocalDate onboardingDate, List<Account> accountList).
+    //      Also added created_at and updated_at to the SELECT so mapRow can read them.
     private Customer mapRow(ResultSet rs) throws SQLException {
         Timestamp createdAt = rs.getTimestamp("created_at");
         Timestamp updatedAt = rs.getTimestamp("updated_at");
 
-        Customer customer = new Customer(
+        return new Customer(
+                rs.getLong("id"),
+                createdAt != null ? createdAt.toLocalDateTime() : null,
+                updatedAt != null ? updatedAt.toLocalDateTime() : null,
                 rs.getString("first_name"),
                 rs.getString("last_name"),
                 rs.getString("email"),
@@ -122,9 +128,5 @@ public class CustomerDaoImpl implements CustomerDao {
                         ? rs.getDate("onboarding_date").toLocalDate() : null,
                 new ArrayList<>()   // accounts loaded separately via AccountDao
         );
-        customer.setId(rs.getLong("id"));
-        customer.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
-        customer.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
-        return customer;
     }
 }

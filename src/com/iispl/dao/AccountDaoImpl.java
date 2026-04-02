@@ -201,23 +201,27 @@ public class AccountDaoImpl implements AccountDao {
     // PRIVATE HELPER
     // =========================================================================
 
-    // FIX: Account only has 5-arg constructor (accountNumber, accountType, customerId, bankId, balance).
-    //      id, createdAt, updatedAt come from BaseEntity setters. status has its own setter.
+    // FIX: Old code called new Account(accountNumber, accountType, customerId, bankId, balance)
+    //      then account.setId() and account.setStatus() separately — old 5-arg constructor
+    //      no longer exists and status is now a constructor param.
+    //      Account now requires (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //      String accountNumber, AccountType accountType, Long customerId, Long bankId,
+    //      BigDecimal balance, String status).
+    //      All SELECTs updated to include created_at, updated_at.
     private Account mapRow(ResultSet rs) throws SQLException {
         Timestamp createdAt = rs.getTimestamp("created_at");
         Timestamp updatedAt = rs.getTimestamp("updated_at");
 
-        Account account = new Account(
+        return new Account(
+                rs.getLong("id"),
+                createdAt != null ? createdAt.toLocalDateTime() : null,
+                updatedAt != null ? updatedAt.toLocalDateTime() : null,
                 rs.getString("account_number"),
                 AccountType.valueOf(rs.getString("account_type")),
                 rs.getLong("customer_id"),
                 rs.getLong("bank_id"),
-                rs.getBigDecimal("balance")
+                rs.getBigDecimal("balance"),
+                rs.getString("status")
         );
-        account.setId(rs.getLong("id"));
-        account.setStatus(rs.getString("status"));
-        account.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
-        account.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
-        return account;
     }
 }

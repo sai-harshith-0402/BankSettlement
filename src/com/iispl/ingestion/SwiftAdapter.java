@@ -46,13 +46,18 @@ public class SwiftAdapter implements TransactionAdapter {
             String nostroAccount = AdapterUtil.readString(row.getCell(4));
             String swiftRef      = AdapterUtil.readString(row.getCell(5));
 
+            // FIX: same constructor fix as CbsAdapter — full 10-arg form.
             return new IncomingTransaction(
+                    null,
+                    null,
+                    null,
                     sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),
                     ProcessingStatus.RECEIVED,
-                    sourceSystem
+                    sourceSystem,
+                    null
             );
 
         } catch (AdapterException e) {

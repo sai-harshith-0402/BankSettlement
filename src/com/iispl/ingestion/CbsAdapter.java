@@ -39,17 +39,31 @@ public class CbsAdapter implements TransactionAdapter {
             AdapterUtil.requireCell(row.getCell(3), SOURCE, "toBankCode",    rowNumber);
             AdapterUtil.requireCell(row.getCell(4), SOURCE, "accountNumber", rowNumber);
 
+            // These are parsed but not yet stored on IncomingTransaction —
+            // they will be used downstream during the mapping phase.
             String fromBankCode  = AdapterUtil.readString(row.getCell(2));
             String toBankCode    = AdapterUtil.readString(row.getCell(3));
             String accountNumber = AdapterUtil.readString(row.getCell(4));
 
+            // FIX: IncomingTransaction constructor is now:
+            //      (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+            //       Long sourceSystemId, TransactionType txnType, BigDecimal amount,
+            //       LocalDateTime ingestTimestamp, ProcessingStatus processingStatus,
+            //       SourceSystem sourceSystem, String batchId)
+            //      Old code called the removed 6-arg constructor.
+            //      id/createdAt/updatedAt are null at ingestion time (not yet persisted).
+            //      batchId is null at ingestion time (assigned during grouping).
             return new IncomingTransaction(
-                    sourceSystem.getId(),
+                    null,                       // id — assigned by DB on save
+                    null,                       // createdAt — set by DB
+                    null,                       // updatedAt — set by DB
+                    sourceSystem.getId(),       // sourceSystemId (FK)
                     txnType,
                     amount,
-                    LocalDateTime.now(),
+                    LocalDateTime.now(),        // ingestTimestamp
                     ProcessingStatus.RECEIVED,
-                    sourceSystem
+                    sourceSystem,               // in-memory object reference
+                    null                        // batchId — assigned during grouping
             );
 
         } catch (AdapterException e) {

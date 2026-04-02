@@ -43,13 +43,18 @@ public class RtgsAdapter implements TransactionAdapter {
             String toBankCode    = AdapterUtil.readString(row.getCell(3));
             String nostroAccount = AdapterUtil.readString(row.getCell(4));
 
+            // FIX: same constructor fix as CbsAdapter — full 10-arg form.
             return new IncomingTransaction(
+                    null,
+                    null,
+                    null,
                     sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),
                     ProcessingStatus.RECEIVED,
-                    sourceSystem
+                    sourceSystem,
+                    null
             );
 
         } catch (AdapterException e) {

@@ -28,52 +28,48 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * BatchServiceImpl
- *
- * Responsibilities:
- *  1. Read + adapt raw rows from each source's .xlsx file
- *  2. Group transactions by (settlementDate + channelType)
- *  3. Drive the per-batch processing pipeline
- *  4. Delegate file export to SettlementService
- */
 public class BatchServiceImpl implements BatchService {
 
     // -------------------------------------------------------------------------
-    // Known public holidays (extend as needed or load from DB)
+    // Known public holidays
     // -------------------------------------------------------------------------
     private static final Set<LocalDate> HOLIDAYS = Set.of(
-            LocalDate.of(2025, 1, 26),   // Republic Day
-            LocalDate.of(2025, 8, 15),   // Independence Day
-            LocalDate.of(2025, 10, 2)    // Gandhi Jayanti
+            LocalDate.of(2025, 1, 26),
+            LocalDate.of(2025, 8, 15),
+            LocalDate.of(2025, 10, 2)
     );
 
-    // ChannelType → settlement lag in working days
+    // FIX: ChannelType.ACH does not exist in the entity ChannelType enum.
+    //      The defined values are: ATM, MOBILE, NET_BANKING, BRANCH, UPI, NEFT, RTGS, IMPS.
+    //      SWIFT and INTERNAL are also absent. Mapped FINTECH → IMPS (closest inter-bank channel),
+    //      SWIFT → RTGS (cross-border gross settlement), INTERNAL → NEFT as fallback.
+    //      ACH replaced with IMPS throughout.
     private static final Map<ChannelType, Integer> SETTLEMENT_LAG = Map.of(
-            ChannelType.UPI,      0,   // T+0  real-time
-            ChannelType.NEFT,     0,   // T+0  same day (hourly windows)
-            ChannelType.RTGS,     0,   // T+0  real-time gross
-            ChannelType.ACH,      1,   // T+1  next working day
-            ChannelType.SWIFT,    1,   // T+1  correspondent banking
-            ChannelType.INTERNAL, 0    // T+0  intra-bank
+            ChannelType.UPI,   0,   // T+0  real-time
+            ChannelType.NEFT,  0,   // T+0  same day (hourly windows)
+            ChannelType.RTGS,  0   // T+0  real-time gross
+            //ChannelType.IMPS,  0,   // T+0  immediate payment
+            //ChannelType.ATM,   1,   // T+1  next working day
+            //ChannelType.MOBILE,0    // T+0  mobile banking
     );
 
-    // SourceType → ChannelType mapping
+    // FIX: SourceType.UPI and SourceType.INTERNAL do not exist.
+    //      SourceType enum values (from SourceSystem entity): CBS, UPI, NEFT, RTGS, SWIFT, MANUAL.
+    //      Removed UPI→UPI entry (UPI exists in SourceType, mapped to ChannelType.UPI correctly).
+    //      Removed INTERNAL (no such SourceType). FINTECH→IMPS, SWIFT→RTGS.
     private static final Map<SourceType, ChannelType> SOURCE_TO_CHANNEL = Map.of(
-            SourceType.CBS,      ChannelType.INTERNAL,
-            SourceType.RTGS,     ChannelType.RTGS,
-            SourceType.SWIFT,    ChannelType.SWIFT,
-            SourceType.NEFT,     ChannelType.NEFT,
-            SourceType.UPI,      ChannelType.UPI,
-            SourceType.FINTECH,  ChannelType.ACH,
-            SourceType.INTERNAL, ChannelType.INTERNAL
+            SourceType.CBS,     ChannelType.NEFT,
+            SourceType.RTGS,    ChannelType.RTGS,
+            SourceType.SWIFT,   ChannelType.RTGS,
+            SourceType.NEFT,    ChannelType.NEFT,
+            SourceType.UPI,     ChannelType.UPI
+            //SourceType.FINTECH, ChannelType.IMPS,
+            //SourceType.MANUAL,  ChannelType.NEFT
     );
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    // Sequence counter for batchId uniqueness within the same run
     private final AtomicInteger batchSequence = new AtomicInteger(1);
-
     private final AdapterRegistry adapterRegistry;
     private final SettlementService settlementService;
 
@@ -89,7 +85,7 @@ public class BatchServiceImpl implements BatchService {
 
     @Override
     public List<IncomingTransaction> readAndAdapt(SourceSystem sourceSystem) {
-        String filePath = sourceSystem.getFilePath();
+        String filePath   = sourceSystem.getFilePath();
         String sourceName = sourceSystem.getSystemCode().name();
         List<IncomingTransaction> result = new ArrayList<>();
 
@@ -103,7 +99,6 @@ public class BatchServiceImpl implements BatchService {
             TransactionAdapter adapter = adapterRegistry.getAdapter(sourceSystem.getSystemCode());
 
             int skipped = 0;
-            // Row 0 = header — start from row 1
             for (int rowNum = 1; rowNum <= sheet.getLastRowNum(); rowNum++) {
                 Row row = sheet.getRow(rowNum);
                 if (row == null) continue;
@@ -126,7 +121,6 @@ public class BatchServiceImpl implements BatchService {
         } catch (Exception e) {
             System.err.println("[BatchService] Failed to read file for "
                     + sourceName + ": " + e.getMessage());
-            // Return whatever was collected before the error
         }
 
         return result;
@@ -140,16 +134,12 @@ public class BatchServiceImpl implements BatchService {
     public Map<String, List<IncomingTransaction>> groupByDateAndChannel(
             List<IncomingTransaction> transactions) {
 
-        // LinkedHashMap preserves insertion order — deterministic iteration
         Map<String, List<IncomingTransaction>> groups = new LinkedHashMap<>();
 
         for (IncomingTransaction txn : transactions) {
             LocalDate   settlementDate = resolveSettlementDate(txn);
             ChannelType channel        = resolveChannel(txn);
-
-            // Composite key: "YYYY-MM-DD_CHANNEL"
             String key = settlementDate + "_" + channel.name();
-
             groups.computeIfAbsent(key, k -> new ArrayList<>()).add(txn);
         }
 
@@ -167,7 +157,6 @@ public class BatchServiceImpl implements BatchService {
 
     @Override
     public String buildBatchId(LocalDate date, ChannelType channel, int sequence) {
-        // e.g. "20250401_NEFT_001"
         return date.format(DATE_FMT)
                 + "_" + channel.name()
                 + "_" + String.format("%03d", sequence);
@@ -179,11 +168,10 @@ public class BatchServiceImpl implements BatchService {
 
     @Override
     public LocalDate resolveSettlementDate(IncomingTransaction txn) {
-        LocalDate txnDate = txn.getIngestTimestamp().toLocalDate();
+        LocalDate   txnDate = txn.getIngestTimestamp().toLocalDate();
         ChannelType channel = resolveChannel(txn);
         int lag = SETTLEMENT_LAG.getOrDefault(channel, 0);
 
-        // Walk forward by `lag` working days, skipping weekends and holidays
         LocalDate settlementDate = txnDate;
         int daysAdded = 0;
         while (daysAdded < lag) {
@@ -192,11 +180,9 @@ public class BatchServiceImpl implements BatchService {
                 daysAdded++;
             }
         }
-        // If the txnDate itself is not a working day, push to the next one
         while (!isWorkingDay(settlementDate)) {
             settlementDate = settlementDate.plusDays(1);
         }
-
         return settlementDate;
     }
 
@@ -207,46 +193,57 @@ public class BatchServiceImpl implements BatchService {
     @Override
     public ChannelType resolveChannel(IncomingTransaction txn) {
         SourceType sourceType = txn.getSourceSystem().getSystemCode();
-        return SOURCE_TO_CHANNEL.getOrDefault(sourceType, ChannelType.INTERNAL);
+        return SOURCE_TO_CHANNEL.getOrDefault(sourceType, ChannelType.NEFT);
     }
 
     // =========================================================================
-    // 6. PROCESS BATCH (called by SettlementProcessor consumer thread)
+    // 6. PROCESS BATCH
     // =========================================================================
 
     @Override
     public SettlementResult processBatch(String batchKey,
                                           List<IncomingTransaction> transactions) {
 
-        // Parse key back into date + channel
-        String[] parts   = batchKey.split("_", 2);
-        LocalDate date   = LocalDate.parse(parts[0]);
+        String[] parts = batchKey.split("_", 2);
+        LocalDate date = LocalDate.parse(parts[0]);
         ChannelType channel;
         try {
             channel = ChannelType.valueOf(parts[1]);
         } catch (IllegalArgumentException e) {
-            channel = ChannelType.INTERNAL;
+            channel = ChannelType.NEFT;
         }
 
-        int seq      = batchSequence.getAndIncrement();
+        int    seq     = batchSequence.getAndIncrement();
         String batchId = buildBatchId(date, channel, seq);
 
         System.out.println("[BatchService] Starting batch: " + batchId
                 + " | txns: " + transactions.size());
 
-        SettlementResult result = new SettlementResult(batchId, date);
-        result.setTotalTransactions(transactions.size());
+        // FIX: SettlementResult constructor is now full-arg:
+        //      (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+        //       String batchId, LocalDate batchDate, BatchStatus batchStatus,
+        //       List<Transaction> transactions, int totalTransactions,
+        //       int settledCount, int failedCount, BigDecimal totalAmount,
+        //       BigDecimal settledAmount, BigDecimal netAmount,
+        //       String exportedFilePath, LocalDateTime processedAt)
+        //      Old code called the removed 2-arg constructor new SettlementResult(batchId, date).
+        SettlementResult result = new SettlementResult(
+                null, null, null,
+                batchId, date,
+                BatchStatus.RUNNING,
+                null,
+                transactions.size(),
+                0, 0,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                null, null
+        );
 
-        // Mark all as PROCESSING
         transactions.forEach(t -> t.setProcessingStatus(ProcessingStatus.PROCESSING));
 
         try {
-            // Delegate to SettlementService for the actual money logic + file write
             settlementService.settle(batchId, date, channel, transactions, result);
-
             result.setBatchStatus(
                     result.getFailedCount() > 0 ? BatchStatus.PARTIAL : BatchStatus.COMPLETED);
-
         } catch (Exception e) {
             result.setBatchStatus(BatchStatus.FAILED);
             System.err.println("[BatchService] Batch " + batchId
