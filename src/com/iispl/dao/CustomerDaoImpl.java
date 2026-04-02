@@ -8,6 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 
 public class CustomerDaoImpl implements CustomerDao {
@@ -65,14 +66,14 @@ public class CustomerDaoImpl implements CustomerDao {
 
     @Override
     public Customer findById(long customerId, Connection conn) {
-        String sql = "SELECT id, first_name, last_name, email, onboarding_date " +
+        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at " +
                      "FROM customer WHERE id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, customerId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return (mapRow(rs));
+                    return mapRow(rs);
                 }
             }
         } catch (SQLException e) {
@@ -87,14 +88,14 @@ public class CustomerDaoImpl implements CustomerDao {
 
     @Override
     public Customer findByEmail(String email, Connection conn) {
-        String sql = "SELECT id, first_name, last_name, email, onboarding_date " +
+        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at " +
                      "FROM customer WHERE email = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return (mapRow(rs));
+                    return mapRow(rs);
                 }
             }
         } catch (SQLException e) {
@@ -107,8 +108,19 @@ public class CustomerDaoImpl implements CustomerDao {
     // PRIVATE HELPER
     // =========================================================================
 
+    // FIX: Old code called new Customer(firstName, lastName, email, date, list) —
+    //      a 5-arg constructor that no longer exists.
+    //      Customer now requires (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //      String firstName, String lastName, String email, LocalDate onboardingDate, List<Account> accountList).
+    //      Also added created_at and updated_at to the SELECT so mapRow can read them.
     private Customer mapRow(ResultSet rs) throws SQLException {
-        Customer customer = new Customer(
+        Timestamp createdAt = rs.getTimestamp("created_at");
+        Timestamp updatedAt = rs.getTimestamp("updated_at");
+
+        return new Customer(
+                rs.getLong("id"),
+                createdAt != null ? createdAt.toLocalDateTime() : null,
+                updatedAt != null ? updatedAt.toLocalDateTime() : null,
                 rs.getString("first_name"),
                 rs.getString("last_name"),
                 rs.getString("email"),
@@ -116,7 +128,5 @@ public class CustomerDaoImpl implements CustomerDao {
                         ? rs.getDate("onboarding_date").toLocalDate() : null,
                 new ArrayList<>()   // accounts loaded separately via AccountDao
         );
-        customer.setId(rs.getLong("id"));
-        return customer;
     }
 }

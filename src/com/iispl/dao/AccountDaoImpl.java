@@ -71,14 +71,14 @@ public class AccountDaoImpl implements AccountDao {
 
     @Override
     public Account findById(long accountId, Connection conn) {
-        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status " +
-                     "FROM account WHERE id = ?";
+        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status, " +
+                     "created_at, updated_at FROM account WHERE id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, accountId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return (mapRow(rs));
+                    return mapRow(rs);
                 }
             }
         } catch (SQLException e) {
@@ -93,14 +93,14 @@ public class AccountDaoImpl implements AccountDao {
 
     @Override
     public Account findByAccountNumber(String accountNumber, Connection conn) {
-        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status " +
-                     "FROM account WHERE account_number = ?";
+        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status, " +
+                     "created_at, updated_at FROM account WHERE account_number = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, accountNumber);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return (mapRow(rs));
+                    return mapRow(rs);
                 }
             }
         } catch (SQLException e) {
@@ -115,8 +115,8 @@ public class AccountDaoImpl implements AccountDao {
 
     @Override
     public List<Account> findByCustomerId(long customerId, Connection conn) {
-        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status " +
-                     "FROM account WHERE customer_id = ? ORDER BY id";
+        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status, " +
+                     "created_at, updated_at FROM account WHERE customer_id = ? ORDER BY id";
 
         List<Account> accounts = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -133,13 +133,13 @@ public class AccountDaoImpl implements AccountDao {
     }
 
     // =========================================================================
-    // FIND BY BANK + TYPE (used to resolve NOSTRO/VOSTRO accounts in settlement)
+    // FIND BY BANK + TYPE
     // =========================================================================
 
     @Override
     public List<Account> findByBankIdAndType(long bankId, AccountType accountType, Connection conn) {
-        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status " +
-                     "FROM account WHERE bank_id = ? AND account_type = ? ORDER BY id";
+        String sql = "SELECT id, account_number, account_type, customer_id, bank_id, balance, status, " +
+                     "created_at, updated_at FROM account WHERE bank_id = ? AND account_type = ? ORDER BY id";
 
         List<Account> accounts = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -158,7 +158,7 @@ public class AccountDaoImpl implements AccountDao {
     }
 
     // =========================================================================
-    // CREDIT — adds amount to balance atomically in DB
+    // CREDIT
     // =========================================================================
 
     @Override
@@ -178,7 +178,7 @@ public class AccountDaoImpl implements AccountDao {
     }
 
     // =========================================================================
-    // DEBIT — subtracts amount from balance atomically in DB
+    // DEBIT
     // =========================================================================
 
     @Override
@@ -201,16 +201,27 @@ public class AccountDaoImpl implements AccountDao {
     // PRIVATE HELPER
     // =========================================================================
 
+    // FIX: Old code called new Account(accountNumber, accountType, customerId, bankId, balance)
+    //      then account.setId() and account.setStatus() separately — old 5-arg constructor
+    //      no longer exists and status is now a constructor param.
+    //      Account now requires (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
+    //      String accountNumber, AccountType accountType, Long customerId, Long bankId,
+    //      BigDecimal balance, String status).
+    //      All SELECTs updated to include created_at, updated_at.
     private Account mapRow(ResultSet rs) throws SQLException {
-        Account account = new Account(
+        Timestamp createdAt = rs.getTimestamp("created_at");
+        Timestamp updatedAt = rs.getTimestamp("updated_at");
+
+        return new Account(
+                rs.getLong("id"),
+                createdAt != null ? createdAt.toLocalDateTime() : null,
+                updatedAt != null ? updatedAt.toLocalDateTime() : null,
                 rs.getString("account_number"),
                 AccountType.valueOf(rs.getString("account_type")),
                 rs.getLong("customer_id"),
                 rs.getLong("bank_id"),
-                rs.getBigDecimal("balance")
+                rs.getBigDecimal("balance"),
+                rs.getString("status")
         );
-        account.setId(rs.getLong("id"));
-        account.setStatus(rs.getString("status"));
-        return account;
     }
 }
