@@ -114,23 +114,21 @@ public class BankDaoImpl implements BankDao {
     // PRIVATE HELPER
     // =========================================================================
 
-    // FIX: Old code called new Bank(bankCode, bankName, ifscCode, isActive) — 4-arg constructor
-    //      that no longer exists. Bank now requires
-    //      (Long id, LocalDateTime createdAt, LocalDateTime updatedAt,
-    //       String bankCode, String bankName, String ifscCode, boolean isActive).
-    //      Also added created_at and updated_at to every SELECT so mapRow can read them.
+    // FIX: Bank only has 4-arg constructor (bankCode, bankName, ifscCode, isActive).
+    //      id, createdAt, updatedAt come from BaseEntity setters.
     private Bank mapRow(ResultSet rs) throws SQLException {
         Timestamp createdAt = rs.getTimestamp("created_at");
         Timestamp updatedAt = rs.getTimestamp("updated_at");
 
-        return new Bank(
-                rs.getLong("id"),
-                createdAt != null ? createdAt.toLocalDateTime() : null,
-                updatedAt != null ? updatedAt.toLocalDateTime() : null,
+        Bank bank = new Bank(
                 rs.getString("bank_code"),
                 rs.getString("bank_name"),
                 rs.getString("ifsc_code"),
                 rs.getBoolean("is_active")
         );
+        bank.setId(rs.getLong("id"));
+        bank.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
+        bank.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
+        return bank;
     }
 }

@@ -46,7 +46,7 @@ public class NeftUpiAdapter implements TransactionAdapter {
             String upiId         = AdapterUtil.readString(row.getCell(5)); // optional — null if absent
 
             return new IncomingTransaction(
-                    sourceSystem.getSourceId(),
+                    sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),

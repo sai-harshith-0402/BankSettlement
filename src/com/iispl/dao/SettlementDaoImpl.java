@@ -20,11 +20,11 @@ public class SettlementDaoImpl implements SettlementDao {
     // SAVE
     // =========================================================================
 
-    // FIX: Table was "settlement_batch" — corrected to "settlement_result"
+    // FIX: Table was "settlement_batch" — corrected to "settlement_batch"
     //      to match the schema and entity class name.
     @Override
     public long save(SettlementResult result, Connection conn) {
-        String sql = "INSERT INTO settlement_result " +
+        String sql = "INSERT INTO settlement_batch " +
                      "(batch_id, batch_date, batch_status, total_transactions, " +
                      " settled_count, failed_count, total_amount, settled_amount, " +
                      " net_amount, exported_file_path, processed_at, created_at, updated_at) " +
@@ -66,7 +66,7 @@ public class SettlementDaoImpl implements SettlementDao {
 
     @Override
     public void update(SettlementResult result, Connection conn) {
-        String sql = "UPDATE settlement_result SET " +
+        String sql = "UPDATE settlement_batch SET " +
                      "batch_status = ?, total_transactions = ?, settled_count = ?, " +
                      "failed_count = ?, total_amount = ?, settled_amount = ?, " +
                      "net_amount = ?, exported_file_path = ?, processed_at = ?, updated_at = NOW() " +
@@ -97,7 +97,7 @@ public class SettlementDaoImpl implements SettlementDao {
 
     @Override
     public void updateStatus(long settlementId, BatchStatus status, Connection conn) {
-        String sql = "UPDATE settlement_result SET batch_status = ?, updated_at = NOW() WHERE id = ?";
+        String sql = "UPDATE settlement_batch SET batch_status = ?, updated_at = NOW() WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setLong(2, settlementId);
@@ -117,7 +117,7 @@ public class SettlementDaoImpl implements SettlementDao {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at, created_at, updated_at " +
-                     "FROM settlement_result WHERE id = ?";
+                     "FROM settlement_batch WHERE id = ?";
 
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, settlementId);
@@ -141,7 +141,7 @@ public class SettlementDaoImpl implements SettlementDao {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at, created_at, updated_at " +
-                     "FROM settlement_result WHERE batch_date = ? ORDER BY id";
+                     "FROM settlement_batch WHERE batch_date = ? ORDER BY id";
 
         List<SettlementResult> results = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -166,7 +166,7 @@ public class SettlementDaoImpl implements SettlementDao {
         String sql = "SELECT id, batch_id, batch_date, batch_status, total_transactions, " +
                      "settled_count, failed_count, total_amount, settled_amount, " +
                      "net_amount, exported_file_path, processed_at, created_at, updated_at " +
-                     "FROM settlement_result WHERE batch_status = ? ORDER BY batch_date DESC";
+                     "FROM settlement_batch WHERE batch_status = ? ORDER BY batch_date DESC";
 
         List<SettlementResult> results = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -186,36 +186,28 @@ public class SettlementDaoImpl implements SettlementDao {
     // PRIVATE HELPER
     // =========================================================================
 
-    // FIX: Old code called new SettlementResult(batchId, batchDate) — 2-arg constructor
-    //      that no longer exists. SettlementResult now requires the full
-    //      (Long id, LocalDateTime createdAt, LocalDateTime updatedAt, String batchId,
-    //       LocalDate batchDate, BatchStatus batchStatus, List<Transaction> transactions,
-    //       int totalTransactions, int settledCount, int failedCount,
-    //       BigDecimal totalAmount, BigDecimal settledAmount, BigDecimal netAmount,
-    //       String exportedFilePath, LocalDateTime processedAt).
-    //      Also added created_at, updated_at to every SELECT.
-    //      transactions list is not loaded here — loaded separately when needed.
     private SettlementResult mapRow(ResultSet rs) throws SQLException {
         Timestamp createdAt   = rs.getTimestamp("created_at");
         Timestamp updatedAt   = rs.getTimestamp("updated_at");
         Timestamp processedAt = rs.getTimestamp("processed_at");
 
-        return new SettlementResult(
-                rs.getLong("id"),
-                createdAt   != null ? createdAt.toLocalDateTime()   : null,
-                updatedAt   != null ? updatedAt.toLocalDateTime()   : null,
+        SettlementResult result = new SettlementResult(
                 rs.getString("batch_id"),
-                rs.getDate("batch_date").toLocalDate(),
-                BatchStatus.valueOf(rs.getString("batch_status")),
-                null,   // transactions — loaded separately via settlement_transaction join table
-                rs.getInt("total_transactions"),
-                rs.getInt("settled_count"),
-                rs.getInt("failed_count"),
-                rs.getBigDecimal("total_amount"),
-                rs.getBigDecimal("settled_amount"),
-                rs.getBigDecimal("net_amount"),
-                rs.getString("exported_file_path"),
-                processedAt != null ? processedAt.toLocalDateTime() : null
+                rs.getDate("batch_date").toLocalDate()
         );
+        result.setId(rs.getLong("id"));
+        result.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
+        result.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
+        result.setBatchStatus(BatchStatus.valueOf(rs.getString("batch_status")));
+        result.setTotalTransactions(rs.getInt("total_transactions"));
+        result.setSettledCount(rs.getInt("settled_count"));
+        result.setFailedCount(rs.getInt("failed_count"));
+        result.setTotalAmount(rs.getBigDecimal("total_amount"));
+        result.setSettledAmount(rs.getBigDecimal("settled_amount"));
+        result.setNetAmount(rs.getBigDecimal("net_amount"));
+        result.setExportedFilePath(rs.getString("exported_file_path"));
+        result.setProcessedAt(processedAt != null ? processedAt.toLocalDateTime() : null);
+        // transactions list not loaded here — fetched separately via TransactionDao if needed
+        return result;
     }
 }

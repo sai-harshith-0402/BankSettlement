@@ -44,7 +44,7 @@ public class RtgsAdapter implements TransactionAdapter {
             String nostroAccount = AdapterUtil.readString(row.getCell(4));
 
             return new IncomingTransaction(
-                    sourceSystem.getSourceId(),
+                    sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),

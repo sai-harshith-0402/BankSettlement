@@ -1,6 +1,7 @@
 package com.iispl.threading;
 
 import com.iispl.entity.IncomingTransaction;
+import com.iispl.entity.IncomingTransaction;
 import com.iispl.entity.SourceSystem;
 import com.iispl.service.BatchService;
 import com.iispl.service.SettlementService;
@@ -39,15 +40,15 @@ public class PipelineOrchestrator {
                 activeSources.size(),
                 0L,
                 TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(activeSources.size() * 2),
+                new LinkedBlockingQueue<>(),        // unbounded — no RejectedExecutionException
                 new ThreadPoolExecutor.CallerRunsPolicy()
         );
 
         // =========================
-        // 3. SCHEDULER (BATCH ENGINE 🔥)
+        // 3. SCHEDULER (BATCH ENGINE)
         // =========================
         Thread schedulerThread = new Thread(
-                new BatchScheduler(queue, batchService, settlementService)
+                new BatchScheduler(queue, batchService)  // SettlementService removed — BatchService owns it
         );
         schedulerThread.setName("batch-scheduler");
         schedulerThread.start();

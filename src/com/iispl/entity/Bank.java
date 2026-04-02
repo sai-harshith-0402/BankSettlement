@@ -1,7 +1,5 @@
 package com.iispl.entity;
 
-import java.time.LocalDateTime;
-
 public final class Bank extends BaseEntity {
 
 	private final String bankCode;
@@ -9,11 +7,7 @@ public final class Bank extends BaseEntity {
 	private final String ifscCode;
 	private final boolean isActive;
 
-	
-
-	public Bank(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, String bankCode, String bankName,
-			String ifscCode, boolean isActive) {
-		super(id, createdAt, updatedAt);
+	public Bank(String bankCode, String bankName, String ifscCode, boolean isActive) {
 		this.bankCode = bankCode;
 		this.bankName = bankName;
 		this.ifscCode = ifscCode;

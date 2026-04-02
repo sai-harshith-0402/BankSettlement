@@ -47,7 +47,7 @@ public class SwiftAdapter implements TransactionAdapter {
             String swiftRef      = AdapterUtil.readString(row.getCell(5));
 
             return new IncomingTransaction(
-                    sourceSystem.getSourceId(),
+                    sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),

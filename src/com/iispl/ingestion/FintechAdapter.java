@@ -50,7 +50,7 @@ public class FintechAdapter implements TransactionAdapter {
             String partnerId     = AdapterUtil.readString(row.getCell(6));
 
             return new IncomingTransaction(
-                    sourceSystem.getSourceId(),
+                    sourceSystem.getId(),
                     txnType,
                     amount,
                     LocalDateTime.now(),

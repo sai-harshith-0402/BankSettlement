@@ -2,7 +2,6 @@ package com.iispl.threading;
 
 import com.iispl.entity.IncomingTransaction;
 import com.iispl.service.BatchService;
-import com.iispl.service.SettlementService;
 
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
@@ -11,17 +10,14 @@ public class BatchScheduler implements Runnable {
 
     private final BlockingQueue<IncomingTransaction> queue;
     private final BatchService batchService;
-    private final SettlementService settlementService;
 
     // Batch window (simulate UPI cycles)
     private static final int BATCH_INTERVAL_SECONDS = 30;
 
     public BatchScheduler(BlockingQueue<IncomingTransaction> queue,
-                          BatchService batchService,
-                          SettlementService settlementService) {
+                          BatchService batchService) {
         this.queue = queue;
         this.batchService = batchService;
-        this.settlementService = settlementService;
     }
 
     @Override
