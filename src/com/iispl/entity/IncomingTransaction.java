@@ -1,74 +1,70 @@
 package com.iispl.entity;
 
-import com.iispl.enums.ProcessingStatus;
-import com.iispl.enums.TransactionType;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public final class IncomingTransaction extends BaseEntity {
+import com.iispl.enums.ProcessingStatus;
+import com.iispl.enums.TransactionType;
 
-	private final Long sourceSystemId;
-	private final TransactionType txnType;
-	private final BigDecimal amount;
-	private final LocalDateTime ingestTimestamp;
-	private ProcessingStatus processingStatus;
+public final class IncomingTransaction {
+	private long incomingTnxId;
 	private SourceSystem sourceSystem;
-	private String batchId;
+	private long sourceSystemId;
+	private TransactionType transactionType;
+	private long debitAccountId;
+	private long creditAccountId;
+	private BigDecimal amount;
+	private ProcessingStatus processingStatus;
+	private LocalDateTime ingestionTimeStamp;
 
-	
-
-	public IncomingTransaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, Long sourceSystemId,
-			TransactionType txnType, BigDecimal amount, LocalDateTime ingestTimestamp,
-			ProcessingStatus processingStatus, SourceSystem sourceSystem, String batchId) {
-		super(id, createdAt, updatedAt);
-		this.sourceSystemId = sourceSystemId;
-		this.txnType = txnType;
-		this.amount = amount;
-		this.ingestTimestamp = ingestTimestamp;
-		this.processingStatus = processingStatus;
+	public IncomingTransaction(long incomingTnxId, SourceSystem sourceSystem, long sourceSystemId,
+			TransactionType transactionType, long debitAccountId, long creditAccountId, BigDecimal amount,
+			ProcessingStatus processingStatus, LocalDateTime ingestionTimeStamp) {
+		this.incomingTnxId = incomingTnxId;
 		this.sourceSystem = sourceSystem;
-		this.batchId = batchId;
-	}
-
-	public ProcessingStatus getProcessingStatus() {
-		return processingStatus;
-	}
-
-	public void setProcessingStatus(ProcessingStatus processingStatus) {
+		this.sourceSystemId = sourceSystemId;
+		this.transactionType = transactionType;
+		this.debitAccountId = debitAccountId;
+		this.creditAccountId = creditAccountId;
+		this.amount = amount;
 		this.processingStatus = processingStatus;
+		this.ingestionTimeStamp = ingestionTimeStamp;
+	}
+
+	public long getIncomingTnxId() {
+		return incomingTnxId;
 	}
 
 	public SourceSystem getSourceSystem() {
 		return sourceSystem;
 	}
 
-	public void setSourceSystem(SourceSystem sourceSystem) {
-		this.sourceSystem = sourceSystem;
-	}
-
-	public Long getSourceSystemId() {
+	public long getSourceSystemId() {
 		return sourceSystemId;
 	}
 
-	public TransactionType getTxnType() {
-		return txnType;
+	public TransactionType getTransactionType() {
+		return transactionType;
 	}
 
 	public BigDecimal getAmount() {
 		return amount;
 	}
 
-	public LocalDateTime getIngestTimestamp() {
-		return ingestTimestamp;
+	public ProcessingStatus getProcessingStatus() {
+		return processingStatus;
 	}
 
-	public String getBatchId() {
-		return batchId;
+	public LocalDateTime getIngestionTimeStamp() {
+		return ingestionTimeStamp;
 	}
 
-	public void setBatchId(String batchId) {
-		this.batchId = batchId;
+	public long getDebitAccountId() {
+		return debitAccountId;
+	}
+
+	public long getCreditAccountId() {
+		return creditAccountId;
 	}
 
 }

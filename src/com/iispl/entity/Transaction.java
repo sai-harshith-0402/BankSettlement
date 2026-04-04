@@ -1,130 +1,48 @@
 package com.iispl.entity;
 
-import com.iispl.enums.ChannelType;
-import com.iispl.enums.TransactionStatus;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-public abstract class Transaction extends BaseEntity {
+import com.iispl.enums.TransactionStatus;
 
-	private SourceSystem sourceSystem;
-	private long sourceSystemId;
-	private ChannelType channel;
-	private Bank fromBank;
-	private Bank toBank;
+public final class Transaction{
+	private long tnxId;
+	private long debitAccountId;
+	private long creditAccountId;
 	private BigDecimal amount;
-	private LocalDateTime txnDate;
+	private LocalDateTime tnxTimeStamp;
 	private TransactionStatus status;
-	private long fromBankId;
-	private long toBankId;
-	private String settlementBatchId;
-
-	
-
-	public Transaction(Long id, LocalDateTime createdAt, LocalDateTime updatedAt, SourceSystem sourceSystem,
-			long sourceSystemId, ChannelType channel, Bank fromBank, Bank toBank, BigDecimal amount,
-			LocalDateTime txnDate, TransactionStatus status, long fromBankId, long toBankId, String settlementBatchId) {
-		super(id, createdAt, updatedAt);
-		this.sourceSystem = sourceSystem;
-		this.sourceSystemId = sourceSystemId;
-		this.channel = channel;
-		this.fromBank = fromBank;
-		this.toBank = toBank;
+	public Transaction(long tnxId, long debitAccountId, long creditAccountId, BigDecimal amount,
+			LocalDateTime tnxTimeStamp, TransactionStatus status) {
+		this.tnxId = tnxId;
+		this.debitAccountId = debitAccountId;
+		this.creditAccountId = creditAccountId;
 		this.amount = amount;
-		this.txnDate = txnDate;
+		this.tnxTimeStamp = tnxTimeStamp;
 		this.status = status;
-		this.fromBankId = fromBankId;
-		this.toBankId = toBankId;
-		this.settlementBatchId = settlementBatchId;
+	}
+	public long getTnxId() {
+		return tnxId;
 	}
 
-	public SourceSystem getSourceSystem() {
-		return sourceSystem;
+	public long getDebitAccountId() {
+		return debitAccountId;
 	}
 
-	public void setSourceSystem(SourceSystem sourceSystem) {
-		this.sourceSystem = sourceSystem;
-	}
-
-	public long getSourceSystemId() {
-		return sourceSystemId;
-	}
-
-	public void setSourceSystemId(long sourceSystemId) {
-		this.sourceSystemId = sourceSystemId;
-	}
-
-	public ChannelType getChannel() {
-		return channel;
-	}
-
-	public void setChannel(ChannelType channel) {
-		this.channel = channel;
-	}
-
-	public Bank getFromBank() {
-		return fromBank;
-	}
-
-	public void setFromBank(Bank fromBank) {
-		this.fromBank = fromBank;
-	}
-
-	public Bank getToBank() {
-		return toBank;
-	}
-
-	public void setToBank(Bank toBank) {
-		this.toBank = toBank;
+	public long getCreditAccountId() {
+		return creditAccountId;
 	}
 
 	public BigDecimal getAmount() {
 		return amount;
 	}
 
-	public void setAmount(BigDecimal amount) {
-		this.amount = amount;
-	}
-
-	public LocalDateTime getTxnDate() {
-		return txnDate;
-	}
-
-	public void setTxnDate(LocalDateTime txnDate) {
-		this.txnDate = txnDate;
+	public LocalDateTime getTnxTimeStamp() {
+		return tnxTimeStamp;
 	}
 
 	public TransactionStatus getStatus() {
 		return status;
-	}
-
-	public void setStatus(TransactionStatus status) {
-		this.status = status;
-	}
-
-	public long getFromBankId() {
-		return fromBankId;
-	}
-
-	public void setFromBankId(long fromBankId) {
-		this.fromBankId = fromBankId;
-	}
-
-	public long getToBankId() {
-		return toBankId;
-	}
-
-	public void setToBankId(long toBankId) {
-		this.toBankId = toBankId;
-	}
-
-	public String getSettlementBatchId() {
-		return settlementBatchId;
-	}
-
-	public void setSettlementBatchId(String settlementBatchId) {
-		this.settlementBatchId = settlementBatchId;
 	}
 
 }
