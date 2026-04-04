@@ -6,29 +6,37 @@ import java.time.LocalDateTime;
 import com.iispl.enums.ProcessingStatus;
 import com.iispl.enums.TransactionType;
 
-public final class IncomingTransaction {
+public class IncomingTransaction {
 	private long incomingTnxId;
 	private SourceSystem sourceSystem;
 	private long sourceSystemId;
 	private TransactionType transactionType;
-	private long debitAccountId;
-	private long creditAccountId;
+	private long fromAccountId;
+	private long toAccountId;
+	private String fromBankName;
+	private String toBankName;
 	private BigDecimal amount;
 	private ProcessingStatus processingStatus;
 	private LocalDateTime ingestionTimeStamp;
+	private String batchId;
 
 	public IncomingTransaction(long incomingTnxId, SourceSystem sourceSystem, long sourceSystemId,
-			TransactionType transactionType, long debitAccountId, long creditAccountId, BigDecimal amount,
-			ProcessingStatus processingStatus, LocalDateTime ingestionTimeStamp) {
+			TransactionType transactionType, long fromAccountId, long toAccountId, String fromBankName,
+			String toBankName, BigDecimal amount, ProcessingStatus processingStatus, LocalDateTime ingestionTimeStamp,
+			String batchId) {
+		super();
 		this.incomingTnxId = incomingTnxId;
 		this.sourceSystem = sourceSystem;
 		this.sourceSystemId = sourceSystemId;
 		this.transactionType = transactionType;
-		this.debitAccountId = debitAccountId;
-		this.creditAccountId = creditAccountId;
+		this.fromAccountId = fromAccountId;
+		this.toAccountId = toAccountId;
+		this.fromBankName = fromBankName;
+		this.toBankName = toBankName;
 		this.amount = amount;
 		this.processingStatus = processingStatus;
 		this.ingestionTimeStamp = ingestionTimeStamp;
+		this.batchId = batchId;
 	}
 
 	public long getIncomingTnxId() {
@@ -47,6 +55,22 @@ public final class IncomingTransaction {
 		return transactionType;
 	}
 
+	public long getFromAccountId() {
+		return fromAccountId;
+	}
+
+	public long getToAccountId() {
+		return toAccountId;
+	}
+
+	public String getFromBankName() {
+		return fromBankName;
+	}
+
+	public String getToBankName() {
+		return toBankName;
+	}
+
 	public BigDecimal getAmount() {
 		return amount;
 	}
@@ -59,12 +83,8 @@ public final class IncomingTransaction {
 		return ingestionTimeStamp;
 	}
 
-	public long getDebitAccountId() {
-		return debitAccountId;
-	}
-
-	public long getCreditAccountId() {
-		return creditAccountId;
+	public String getBatchId() {
+		return batchId;
 	}
 
 }
