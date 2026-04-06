@@ -4,49 +4,40 @@ import com.iispl.entity.Account;
 import com.iispl.enums.AccountType;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
 import java.util.List;
 
 public interface AccountDao {
 
-    /**
-     * Inserts a new Account row. Returns the generated DB id.
-     */
-    long save(Account account, Connection conn);
+    // Persist a new account record
+    Account saveAccount(Account account);
 
-    /**
-     * Updates balance and status for an existing account.
-     */
-    void update(Account account, Connection conn);
+    // Update all mutable fields of an existing account
+    Account updateAccount(Account account);
 
-    /**
-     * Finds an account by its generated id.
-     */
-    Account findById(long accountId, Connection conn);
+    // Delete an account by its primary key
+    void deleteAccount(Long id);
 
-    /**
-     * Finds an account by its account number (unique business key).
-     */
-    Account findByAccountNumber(String accountNumber, Connection conn);
+    // Fetch a single account by primary key; returns null if not found
+    Account findAccountById(Long id);
 
-    /**
-     * Returns all accounts belonging to a customer.
-     */
-    List<Account> findByCustomerId(long customerId, Connection conn);
+    // Fetch all accounts in the system
+    List<Account> findAllAccounts();
 
-    /**
-     * Returns all accounts of a given type held at a specific bank.
-     * Useful for locating NOSTRO / VOSTRO accounts during settlement.
-     */
-    List<Account> findByBankIdAndType(long bankId, AccountType accountType, Connection conn);
+    // Fetch all accounts belonging to a specific customer
+    List<Account> findAccountByCustomerId(Long customerId);
 
-    /**
-     * Applies a credit (adds amount) to an account's balance atomically.
-     */
-    void credit(long accountId, BigDecimal amount, Connection conn);
+    // Update only the balance field of an account
+    void updateBalance(Long accountId, BigDecimal newBalance);
 
-    /**
-     * Applies a debit (subtracts amount) to an account's balance atomically.
-     */
-    void debit(long accountId, BigDecimal amount, Connection conn);
+    // Fetch an account by its unique account number; returns null if not found
+    Account findAccountByAccountNumber(String accountNumber);
+
+    // Fetch all accounts linked to a specific bank
+    List<Account> findAccountsByBankId(Long bankId);
+
+    // Fetch all accounts filtered by account type (SAVINGS, CURRENT, NOSTRO, etc.)
+    List<Account> findAccountsByType(AccountType accountType);
+
+    // Update only the status field (ACTIVE, INACTIVE, BLOCKED, etc.)
+    void updateStatus(Long accountId, String status);
 }

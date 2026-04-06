@@ -2,29 +2,34 @@ package com.iispl.dao;
 
 import com.iispl.entity.Bank;
 
-import java.sql.Connection;
 import java.util.List;
 
 public interface BankDao {
 
-    /**
-     * Inserts a new Bank row. Returns the generated DB id.
-     */
-    long save(Bank bank, Connection conn);
+    // Persist a new bank record
+    Bank saveBank(Bank bank);
 
-    /**
-     * Finds a bank by its generated DB id.
-     */
-    Bank findById(long bankId, Connection conn);
+    // Toggle or set the isActive status of a bank
+    void changeStatus(Long bankId, boolean isActive);
 
-    /**
-     * Finds a bank by its bankCode (unique business key — e.g. BIC or IFSC prefix).
-     */
-    Bank findByBankCode(String bankCode, Connection conn);
+    // Fetch all banks in the system
+    List<Bank> findAllBanks();
 
-    /**
-     * Returns all active banks — used during adapter mapping to resolve
-     * fromBankCode / toBankCode strings to Bank objects.
-     */
-    List<Bank> findAllActive(Connection conn);
+    // Fetch a single bank by its primary key; returns null if not found
+    Bank findBankById(Long id);
+
+    // Fetch a bank by its unique bank code; returns null if not found
+    Bank findBankByBankCode(String bankCode);
+
+    // Fetch a bank by its IFSC code; returns null if not found
+    Bank findBankByIfscCode(String ifscCode);
+
+    // Fetch only active banks (isActive = true)
+    List<Bank> findAllActiveBanks();
+
+    // Update mutable fields of an existing bank record
+    Bank updateBank(Bank bank);
+
+    // Remove a bank record by its primary key
+    void deleteBank(Long bankId);
 }
