@@ -1,7 +1,11 @@
 package com.iispl.entity;
 
 import java.time.LocalDateTime;
+
 import java.util.List;
+
+
+
 
 public class Bank extends BaseEntity {
 	private String bankCode;
@@ -11,6 +15,7 @@ public class Bank extends BaseEntity {
 
 	public Bank(long id, LocalDateTime createdAt, LocalDateTime updatedAt, String bankCode, String bankName,
 			String ifscCode, List<Customer> customers) {
+
 		super(id, createdAt, updatedAt);
 		this.bankCode = bankCode;
 		this.bankName = bankName;
