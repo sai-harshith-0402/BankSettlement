@@ -10,19 +10,26 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.List;
 
 public class CustomerDaoImpl implements CustomerDao {
+
+    private final Connection connection;
+
+    public CustomerDaoImpl(Connection connection) {
+        this.connection = connection;
+    }
 
     // =========================================================================
     // SAVE
     // =========================================================================
 
     @Override
-    public long save(Customer customer, Connection conn) {
-        String sql = "INSERT INTO customer (first_name, last_name, email, onboarding_date, created_at, updated_at) " +
-                     "VALUES (?, ?, ?, ?, NOW(), NOW())";
+    public long save(Customer customer) {
+        String sql = "INSERT INTO customer (first_name, last_name, email, onboarding_date, created_at, updated_at) "
+                   + "VALUES (?, ?, ?, ?, NOW(), NOW())";
 
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, customer.getFirstName());
             ps.setString(2, customer.getLastName());
             ps.setString(3, customer.getEmail());
@@ -45,19 +52,69 @@ public class CustomerDaoImpl implements CustomerDao {
     }
 
     // =========================================================================
-    // UPDATE
+    // DELETE
     // =========================================================================
 
     @Override
-    public void update(Customer customer, Connection conn) {
-        String sql = "UPDATE customer SET email = ?, updated_at = NOW() WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, customer.getEmail());
-            ps.setLong(2, customer.getId());
+    public void delete(Long customerId) {
+        String sql = "DELETE FROM customer WHERE id = ?";
+
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setLong(1, customerId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to update Customer id=" + customer.getId(), e);
+            throw new RuntimeException("Failed to delete Customer id=" + customerId + ": " + e.getMessage(), e);
         }
+    }
+
+    // =========================================================================
+    // FIND BY BANK ID
+    // Customers are linked to banks through their accounts, so we join
+    // customer -> account on customer.id = account.customer_id and filter
+    // by account.bank_id. DISTINCT avoids duplicates for multi-account customers.
+    // =========================================================================
+
+    @Override
+    public List<Customer> findByBankId(Long bankId) {
+        String sql = "SELECT DISTINCT c.id, c.first_name, c.last_name, c.email, "
+                   + "               c.onboarding_date, c.created_at, c.updated_at "
+                   + "FROM customer c "
+                   + "JOIN account a ON a.customer_id = c.id "
+                   + "WHERE a.bank_id = ?";
+        List<Customer> list = new ArrayList<>();
+
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setLong(1, bankId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find Customers for bankId=" + bankId + ": " + e.getMessage(), e);
+        }
+        return list;
+    }
+
+    // =========================================================================
+    // FIND ALL
+    // =========================================================================
+
+    @Override
+    public List<Customer> findAll() {
+        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at "
+                   + "FROM customer";
+        List<Customer> list = new ArrayList<>();
+
+        try (PreparedStatement ps = connection.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to fetch all Customers: " + e.getMessage(), e);
+        }
+        return list;
     }
 
     // =========================================================================
@@ -65,11 +122,11 @@ public class CustomerDaoImpl implements CustomerDao {
     // =========================================================================
 
     @Override
-    public Customer findById(long customerId, Connection conn) {
-        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at " +
-                     "FROM customer WHERE id = ?";
+    public Customer findById(Long customerId) {
+        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at "
+                   + "FROM customer WHERE id = ?";
 
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setLong(1, customerId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -77,7 +134,7 @@ public class CustomerDaoImpl implements CustomerDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find Customer id=" + customerId, e);
+            throw new RuntimeException("Failed to find Customer id=" + customerId + ": " + e.getMessage(), e);
         }
         return null;
     }
@@ -87,11 +144,11 @@ public class CustomerDaoImpl implements CustomerDao {
     // =========================================================================
 
     @Override
-    public Customer findByEmail(String email, Connection conn) {
-        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at " +
-                     "FROM customer WHERE email = ?";
+    public Customer findByEmail(String email) {
+        String sql = "SELECT id, first_name, last_name, email, onboarding_date, created_at, updated_at "
+                   + "FROM customer WHERE email = ?";
 
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
             ps.setString(1, email);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -99,22 +156,41 @@ public class CustomerDaoImpl implements CustomerDao {
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find Customer email=" + email, e);
+            throw new RuntimeException("Failed to find Customer email=" + email + ": " + e.getMessage(), e);
         }
         return null;
     }
 
     // =========================================================================
-    // PRIVATE HELPER
+    // UPDATE
     // =========================================================================
 
-    // FIX: Customer only has 5-arg constructor (firstName, lastName, email, onboardingDate, accountList).
-    //      id, createdAt, updatedAt come from BaseEntity setters.
+    @Override
+    public void update(Customer customer) {
+        String sql = "UPDATE customer SET email = ?, updated_at = NOW() WHERE id = ?";
+
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, customer.getEmail());
+            ps.setLong(2, customer.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update Customer id=" + customer.getId() + ": " + e.getMessage(), e);
+        }
+    }
+
+    // =========================================================================
+    // PRIVATE HELPER
+    // accounts are loaded separately via AccountDao — passed as empty list here
+    // =========================================================================
+
     private Customer mapRow(ResultSet rs) throws SQLException {
         Timestamp createdAt = rs.getTimestamp("created_at");
         Timestamp updatedAt = rs.getTimestamp("updated_at");
 
         Customer customer = new Customer(
+                rs.getLong("id"),
+                createdAt != null ? createdAt.toLocalDateTime() : null,
+                updatedAt != null ? updatedAt.toLocalDateTime() : null,
                 rs.getString("first_name"),
                 rs.getString("last_name"),
                 rs.getString("email"),
@@ -122,9 +198,6 @@ public class CustomerDaoImpl implements CustomerDao {
                         ? rs.getDate("onboarding_date").toLocalDate() : null,
                 new ArrayList<>()   // accounts loaded separately via AccountDao
         );
-        customer.setId(rs.getLong("id"));
-        customer.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
-        customer.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
         return customer;
     }
 }

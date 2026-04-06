@@ -2,28 +2,29 @@ package com.iispl.dao;
 
 import com.iispl.entity.Customer;
 
-import java.sql.Connection;
+import java.util.List;
 
 public interface CustomerDao {
 
-    /**
-     * Inserts a new Customer row (without accounts — accounts saved separately via AccountDao).
-     * Returns the generated DB id.
-     */
-    long save(Customer customer, Connection conn);
+    // Persist a new Customer row (accounts saved separately via AccountDao);
+    // returns the generated DB id
+    long save(Customer customer);
 
-    /**
-     * Updates email for an existing customer.
-     */
-    void update(Customer customer, Connection conn);
+    // Hard-delete a customer record by primary key
+    void delete(Long customerId);
 
-    /**
-     * Finds a customer by generated DB id.
-     */
-    Customer findById(long customerId, Connection conn);
+    // Fetch all customers that have at least one account linked to the given bank
+    List<Customer> findByBankId(Long bankId);
 
-    /**
-     * Finds a customer by email (unique business key).
-     */
-    Customer findByEmail(String email, Connection conn);
+    // Fetch every customer row in the system
+    List<Customer> findAll();
+
+    // Fetch a single customer by primary key; returns null if not found
+    Customer findById(Long customerId);
+
+    // Fetch a single customer by email (unique business key); returns null if not found
+    Customer findByEmail(String email);
+
+    // Update mutable fields (email) on an existing customer row
+    void update(Customer customer);
 }
