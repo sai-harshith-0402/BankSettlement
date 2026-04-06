@@ -20,8 +20,6 @@ public class SettlementDaoImpl implements SettlementDao {
     // SAVE
     // =========================================================================
 
-    // FIX: Table was "settlement_batch" — corrected to "settlement_batch"
-    //      to match the schema and entity class name.
     @Override
     public long save(SettlementResult result, Connection conn) {
         String sql = "INSERT INTO settlement_batch " +
@@ -92,7 +90,7 @@ public class SettlementDaoImpl implements SettlementDao {
     }
 
     // =========================================================================
-    // UPDATE STATUS only
+    // UPDATE STATUS ONLY
     // =========================================================================
 
     @Override
@@ -103,8 +101,7 @@ public class SettlementDaoImpl implements SettlementDao {
             ps.setLong(2, settlementId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to update SettlementResult status id="
-                    + settlementId, e);
+            throw new RuntimeException("Failed to update SettlementResult status id=" + settlementId, e);
         }
     }
 
@@ -184,6 +181,9 @@ public class SettlementDaoImpl implements SettlementDao {
 
     // =========================================================================
     // PRIVATE HELPER
+    // Uses the full 15-arg constructor that matches the SettlementResult entity.
+    // The transactions list is not loaded here — fetched separately via
+    // TransactionDao if needed.
     // =========================================================================
 
     private SettlementResult mapRow(ResultSet rs) throws SQLException {
@@ -191,23 +191,22 @@ public class SettlementDaoImpl implements SettlementDao {
         Timestamp updatedAt   = rs.getTimestamp("updated_at");
         Timestamp processedAt = rs.getTimestamp("processed_at");
 
-        SettlementResult result = new SettlementResult(
+        return new SettlementResult(
+                rs.getLong("id"),
+                createdAt   != null ? createdAt.toLocalDateTime()   : null,
+                updatedAt   != null ? updatedAt.toLocalDateTime()   : null,
                 rs.getString("batch_id"),
-                rs.getDate("batch_date").toLocalDate()
+                rs.getDate("batch_date").toLocalDate(),
+                BatchStatus.valueOf(rs.getString("batch_status")),
+                new ArrayList<>(),                                          // transactions loaded separately
+                rs.getInt("total_transactions"),
+                rs.getInt("settled_count"),
+                rs.getInt("failed_count"),
+                rs.getBigDecimal("total_amount"),
+                rs.getBigDecimal("settled_amount"),
+                rs.getBigDecimal("net_amount"),
+                rs.getString("exported_file_path"),
+                processedAt != null ? processedAt.toLocalDateTime() : null
         );
-        result.setId(rs.getLong("id"));
-        result.setCreatedAt(createdAt != null ? createdAt.toLocalDateTime() : null);
-        result.setUpdatedAt(updatedAt != null ? updatedAt.toLocalDateTime() : null);
-        result.setBatchStatus(BatchStatus.valueOf(rs.getString("batch_status")));
-        result.setTotalTransactions(rs.getInt("total_transactions"));
-        result.setSettledCount(rs.getInt("settled_count"));
-        result.setFailedCount(rs.getInt("failed_count"));
-        result.setTotalAmount(rs.getBigDecimal("total_amount"));
-        result.setSettledAmount(rs.getBigDecimal("settled_amount"));
-        result.setNetAmount(rs.getBigDecimal("net_amount"));
-        result.setExportedFilePath(rs.getString("exported_file_path"));
-        result.setProcessedAt(processedAt != null ? processedAt.toLocalDateTime() : null);
-        // transactions list not loaded here — fetched separately via TransactionDao if needed
-        return result;
     }
 }

@@ -1,52 +1,27 @@
 package com.iispl.dao;
 
-import com.iispl.entity.CreditTransaction;
-import com.iispl.entity.DebitTransaction;
 import com.iispl.entity.IncomingTransaction;
-import com.iispl.entity.InterBankTransaction;
-import com.iispl.entity.ReversalTransaction;
-import com.iispl.entity.Transaction;
-import com.iispl.enums.TransactionStatus;
+import com.iispl.enums.ProcessingStatus;
 
-import java.sql.Connection;
 import java.util.List;
 
 public interface TransactionDao {
 
-    /**
-     * Persists a raw incoming transaction (before mapping/settlement).
-     * Returns the generated DB id.
-     */
-    long saveIncoming(IncomingTransaction txn, Connection conn);
+    // Persist a new incoming transaction; returns the entity with generated id set
+    IncomingTransaction save(IncomingTransaction transaction);
 
-    /**
-     * Updates the processing_status of an IncomingTransaction row.
-     */
-    void updateIncomingStatus(long incomingId, String processingStatus, Connection conn);
+    // Fetch all incoming transactions
+    List<IncomingTransaction> findAll();
 
-    // ---- concrete subtypes ----
+    // Fetch by primary key; returns null if not found
+    IncomingTransaction findById(long id);
 
-    long saveCreditTransaction(CreditTransaction txn, Connection conn);
+    // Assign or update the batch id on a transaction
+    void updateBatchId(long id, String batchId);
 
-    long saveDebitTransaction(DebitTransaction txn, Connection conn);
+    // Fetch all transactions from a specific source system
+    List<IncomingTransaction> findBySourceSystemId(long sourceSystemId);
 
-    long saveInterBankTransaction(InterBankTransaction txn, Connection conn);
-
-    long saveReversalTransaction(ReversalTransaction txn, Connection conn);
-
-    /**
-     * Updates the status column on the transaction base table.
-     */
-    void updateTransactionStatus(long transactionId, TransactionStatus status, Connection conn);
-
-    /**
-     * Fetches any transaction by its base-table id.
-     * Returns empty if not found.
-     */
-    Transaction findById(long transactionId, Connection conn);
-
-    /**
-     * Returns all transactions belonging to a settlement batch.
-     */
-    List<Transaction> findByBatchId(long batchId, Connection conn);
+    // Fetch all transactions with a given processing status
+    List<IncomingTransaction> findByProcessingStatus(ProcessingStatus status);
 }

@@ -1,120 +1,111 @@
 package com.iispl.dao;
 
-import com.iispl.entity.Bank;
-import com.iispl.entity.CreditTransaction;
-import com.iispl.entity.DebitTransaction;
 import com.iispl.entity.IncomingTransaction;
-import com.iispl.entity.InterBankTransaction;
-import com.iispl.entity.ReversalTransaction;
 import com.iispl.entity.SourceSystem;
-import com.iispl.entity.Transaction;
-import com.iispl.enums.ChannelType;
+import com.iispl.enums.ProcessingStatus;
 import com.iispl.enums.SourceType;
-import com.iispl.enums.TransactionStatus;
 import com.iispl.enums.TransactionType;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class TransactionDaoImpl implements TransactionDao {
 
+    private final Connection connection;
+
+    public TransactionDaoImpl(Connection connection) {
+        this.connection = connection;
+    }
+
+    // SQL constants
+    private static final String INSERT =
+            "INSERT INTO incoming_transaction " +
+            "(source_system_id, txn_type, amount, ingest_timestamp, processing_status, batch_id, created_at, updated_at) " +
+            "VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())";
+
+    private static final String SELECT_COLS =
+            "SELECT t.id, t.source_system_id, t.txn_type, t.amount, t.ingest_timestamp, " +
+            "       t.processing_status, t.batch_id, t.created_at, t.updated_at, " +
+            "       s.id AS ss_id, s.system_code, s.file_path, s.is_active, " +
+            "       s.created_at AS ss_created_at, s.updated_at AS ss_updated_at " +
+            "FROM   incoming_transaction t " +
+            "JOIN   source_system s ON s.id = t.source_system_id";
+
+    private static final String SELECT_ALL = SELECT_COLS;
+
+    private static final String SELECT_BY_ID = SELECT_COLS +
+            " WHERE t.id = ?";
+
+    private static final String SELECT_BY_SOURCE_SYSTEM = SELECT_COLS +
+            " WHERE t.source_system_id = ?";
+
+    private static final String SELECT_BY_STATUS = SELECT_COLS +
+            " WHERE t.processing_status = ?";
+
+    private static final String UPDATE_BATCH_ID =
+            "UPDATE incoming_transaction SET batch_id = ?, updated_at = NOW() WHERE id = ?";
+
     // =========================================================================
-    // INCOMING TRANSACTION
+    // SAVE
     // =========================================================================
 
-    // FIX: Column "settlement_batch_id" renamed to "batch_id" to match
-    //      incoming_transaction table in schema and IncomingTransaction.getBatchId().
     @Override
-    public long saveIncoming(IncomingTransaction txn, Connection conn) {
-        String sql = "INSERT INTO incoming_transaction " +
-                     "(source_system_id, txn_type, amount, ingest_timestamp, " +
-                     " processing_status, batch_id, created_at, updated_at) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())";
+    public IncomingTransaction save(IncomingTransaction transaction) {
+        try (PreparedStatement ps = connection.prepareStatement(INSERT, Statement.RETURN_GENERATED_KEYS)) {
 
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setLong(1, txn.getSourceSystemId());
-            ps.setString(2, txn.getTxnType().name());
-            ps.setBigDecimal(3, txn.getAmount());
-            ps.setTimestamp(4, Timestamp.valueOf(txn.getIngestTimestamp()));
-            ps.setString(5, txn.getProcessingStatus().name());
-            if (txn.getBatchId() != null) {
-                ps.setString(6, txn.getBatchId());
+            ps.setLong(1, transaction.getSourceSystemId());
+            ps.setString(2, transaction.getTxnType().name());
+            ps.setBigDecimal(3, transaction.getAmount());
+            ps.setTimestamp(4, Timestamp.valueOf(transaction.getIngestTimestamp()));
+            ps.setString(5, transaction.getProcessingStatus().name());
+
+            if (transaction.getBatchId() == null) {
+                ps.setNull(6, Types.VARCHAR);
             } else {
-                ps.setNull(6, java.sql.Types.VARCHAR);
+                ps.setString(6, transaction.getBatchId());
             }
+
             ps.executeUpdate();
 
-            try (ResultSet rs = ps.getGeneratedKeys()) {
-                if (rs.next()) {
-                    long id = rs.getLong(1);
-                    txn.setId(id);
-                    return id;
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) {
+                    transaction.setId(keys.getLong(1));
                 }
             }
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to save IncomingTransaction: " + e.getMessage(), e);
         }
-        throw new RuntimeException("saveIncoming: no generated key returned");
+        return transaction;
     }
 
+    // =========================================================================
+    // FIND ALL
+    // =========================================================================
+
     @Override
-    public void updateIncomingStatus(long incomingId, String processingStatus, Connection conn) {
-        String sql = "UPDATE incoming_transaction SET processing_status = ?, updated_at = NOW() WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, processingStatus);
-            ps.setLong(2, incomingId);
-            ps.executeUpdate();
+    public List<IncomingTransaction> findAll() {
+        List<IncomingTransaction> list = new ArrayList<>();
+
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_ALL);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                list.add(mapRow(rs));
+            }
+
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to update IncomingTransaction status id=" + incomingId, e);
+            throw new RuntimeException("Failed to fetch all IncomingTransactions: " + e.getMessage(), e);
         }
-    }
-
-    // =========================================================================
-    // SAVE SUBTYPES — all delegate to saveBaseTransaction
-    // =========================================================================
-
-    @Override
-    public long saveCreditTransaction(CreditTransaction txn, Connection conn) {
-        return saveBaseTransaction(txn, conn);
-    }
-
-    @Override
-    public long saveDebitTransaction(DebitTransaction txn, Connection conn) {
-        return saveBaseTransaction(txn, conn);
-    }
-
-    @Override
-    public long saveInterBankTransaction(InterBankTransaction txn, Connection conn) {
-        return saveBaseTransaction(txn, conn);
-    }
-
-    @Override
-    public long saveReversalTransaction(ReversalTransaction txn, Connection conn) {
-        return saveBaseTransaction(txn, conn);
-    }
-
-    // =========================================================================
-    // UPDATE STATUS
-    // =========================================================================
-
-    @Override
-    public void updateTransactionStatus(long transactionId, TransactionStatus status, Connection conn) {
-        String sql = "UPDATE settlement_transaction SET status = ?, updated_at = NOW() WHERE id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, status.name());
-            ps.setLong(2, transactionId);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to update transaction status id=" + transactionId, e);
-        }
+        return list;
     }
 
     // =========================================================================
@@ -122,214 +113,122 @@ public class TransactionDaoImpl implements TransactionDao {
     // =========================================================================
 
     @Override
-    public Transaction findById(long transactionId, Connection conn) {
-        String sql = "SELECT id, source_system_id, channel, amount, txn_date, status, " +
-                     "from_bank_id, to_bank_id, txn_subtype, settlement_batch_id, " +
-                     "credit_account_id, debit_account_id, nostro_account_id, " +
-                     "original_transaction_id, reversal_reason, created_at, updated_at " +
-                     "FROM settlement_transaction WHERE id = ?";
+    public IncomingTransaction findById(long id) {
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_ID)) {
 
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, transactionId);
+            ps.setLong(1, id);
+
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return mapBaseRow(rs);
+                    return mapRow(rs);
                 }
             }
+
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find transaction id=" + transactionId, e);
+            throw new RuntimeException("Failed to fetch IncomingTransaction id=" + id + ": " + e.getMessage(), e);
         }
         return null;
     }
 
     // =========================================================================
-    // FIND BY BATCH
+    // UPDATE BATCH ID
     // =========================================================================
 
     @Override
-    public List<Transaction> findByBatchId(long batchId, Connection conn) {
-        String sql = "SELECT t.id, t.source_system_id, t.channel, t.amount, t.txn_date, t.status, " +
-                     "t.from_bank_id, t.to_bank_id, t.txn_subtype, t.settlement_batch_id, " +
-                     "t.credit_account_id, t.debit_account_id, t.nostro_account_id, " +
-                     "t.original_transaction_id, t.reversal_reason, t.created_at, t.updated_at " +
-                     "FROM settlement_transaction t " +
-                     "WHERE t.settlement_batch_id = ?";
+    public void updateBatchId(long id, String batchId) {
+        try (PreparedStatement ps = connection.prepareStatement(UPDATE_BATCH_ID)) {
 
-        List<Transaction> result = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, batchId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapBaseRow(rs));
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch transactions for batchId=" + batchId, e);
-        }
-        return result;
-    }
-
-    // =========================================================================
-    // PRIVATE HELPERS
-    // =========================================================================
-
-    // FIX 1: Table corrected from "settlement_transaction" to "transaction".
-    // FIX 2: Removed bogus "source_system_ref_id" duplicate column — only
-    //        source_system_id exists on the transaction table.
-    // FIX 3: Added account_id column to INSERT (required NOT NULL FK on transaction table).
-    // FIX 4: settlement_batch_id is VARCHAR on the entity (String), so use setString not setLong.
-    // FIX 5: txn_type replaces txn_subtype as discriminator column name.
-    private long saveBaseTransaction(Transaction txn, Connection conn) {
-        String sql = "INSERT INTO transaction " +
-                     "(source_system_id, account_id, channel, from_bank_id, to_bank_id, " +
-                     " amount, txn_date, status, txn_type, settlement_batch_id, " +
-                     " credit_account_id, debit_account_id, nostro_account_id, " +
-                     " original_transaction_id, reversal_reason, created_at, updated_at) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setLong(1, txn.getSourceSystemId());
-
-            // FIX: account_id is required. Resolved from the subtype-specific account FK.
-            long accountId = resolveAccountId(txn);
-            ps.setLong(2, accountId);
-
-            ps.setString(3, txn.getChannel() != null ? txn.getChannel().name() : null);
-            ps.setLong(4, txn.getFromBankId());
-            ps.setLong(5, txn.getToBankId());
-            ps.setBigDecimal(6, txn.getAmount());
-            ps.setTimestamp(7, Timestamp.valueOf(txn.getTxnDate()));
-            ps.setString(8, txn.getStatus() != null ? txn.getStatus().name() : null);
-            ps.setString(9, txn.getClass().getSimpleName()
-                    .replace("Transaction", "").toUpperCase()); // e.g. "CREDIT"
-
-            // settlement_batch_id is a String field on the entity
-            if (txn.getSettlementBatchId() != null) {
-                ps.setString(10, txn.getSettlementBatchId());
-            } else {
-                ps.setNull(10, java.sql.Types.VARCHAR);
-            }
-
-            // subtype-specific nullable columns
-            if (txn instanceof CreditTransaction ct) {
-                ps.setLong(11, ct.getCreditAccountId());
-                ps.setNull(12, java.sql.Types.BIGINT);
-                ps.setNull(13, java.sql.Types.BIGINT);
-                ps.setNull(14, java.sql.Types.BIGINT);
-                ps.setNull(15, java.sql.Types.VARCHAR);
-            } else if (txn instanceof DebitTransaction dt) {
-                ps.setNull(11, java.sql.Types.BIGINT);
-                ps.setLong(12, dt.getDebitAccountId());
-                ps.setNull(13, java.sql.Types.BIGINT);
-                ps.setNull(14, java.sql.Types.BIGINT);
-                ps.setNull(15, java.sql.Types.VARCHAR);
-            } else if (txn instanceof InterBankTransaction it) {
-                ps.setNull(11, java.sql.Types.BIGINT);
-                ps.setNull(12, java.sql.Types.BIGINT);
-                ps.setLong(13, it.getNostroAccountId());
-                ps.setNull(14, java.sql.Types.BIGINT);
-                ps.setNull(15, java.sql.Types.VARCHAR);
-            } else if (txn instanceof ReversalTransaction rt) {
-                ps.setNull(11, java.sql.Types.BIGINT);
-                ps.setNull(12, java.sql.Types.BIGINT);
-                ps.setNull(13, java.sql.Types.BIGINT);
-                ps.setLong(14, rt.getOriginalTransactionId());
-                ps.setString(15, rt.getReversalReason());
-            } else {
-                ps.setNull(11, java.sql.Types.BIGINT);
-                ps.setNull(12, java.sql.Types.BIGINT);
-                ps.setNull(13, java.sql.Types.BIGINT);
-                ps.setNull(14, java.sql.Types.BIGINT);
-                ps.setNull(15, java.sql.Types.VARCHAR);
-            }
-
+            ps.setString(1, batchId);
+            ps.setLong(2, id);
             ps.executeUpdate();
 
-            try (ResultSet rs = ps.getGeneratedKeys()) {
-                if (rs.next()) {
-                    long id = rs.getLong(1);
-                    txn.setId(id);
-                    return id;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to update batchId for IncomingTransaction id=" + id + ": " + e.getMessage(), e);
+        }
+    }
+
+    // =========================================================================
+    // FIND BY SOURCE SYSTEM ID
+    // =========================================================================
+
+    @Override
+    public List<IncomingTransaction> findBySourceSystemId(long sourceSystemId) {
+        List<IncomingTransaction> list = new ArrayList<>();
+
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_SOURCE_SYSTEM)) {
+
+            ps.setLong(1, sourceSystemId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
                 }
             }
+
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to insert transaction row: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to fetch IncomingTransactions for sourceSystemId="
+                    + sourceSystemId + ": " + e.getMessage(), e);
         }
-        throw new RuntimeException("saveBaseTransaction: no generated key returned");
+        return list;
     }
 
-    // Derives the primary account_id from whichever subtype-specific FK is present.
-    private long resolveAccountId(Transaction txn) {
-        if (txn instanceof CreditTransaction ct)    return ct.getCreditAccountId();
-        if (txn instanceof DebitTransaction dt)      return dt.getDebitAccountId();
-        if (txn instanceof InterBankTransaction it)  return it.getNostroAccountId();
-        if (txn instanceof ReversalTransaction rt)   return rt.getOriginalTransactionId();
-        throw new IllegalArgumentException("Unknown transaction subtype: " + txn.getClass());
+    // =========================================================================
+    // FIND BY PROCESSING STATUS
+    // =========================================================================
+
+    @Override
+    public List<IncomingTransaction> findByProcessingStatus(ProcessingStatus status) {
+        List<IncomingTransaction> list = new ArrayList<>();
+
+        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_STATUS)) {
+
+            ps.setString(1, status.name());
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to fetch IncomingTransactions by status="
+                    + status + ": " + e.getMessage(), e);
+        }
+        return list;
     }
 
-    private Transaction mapBaseRow(ResultSet rs) throws SQLException {
-        long         id             = rs.getLong("id");
-        long         sourceSystemId = rs.getLong("source_system_id");
-        String       channelStr     = rs.getString("channel");
-        long         fromBankId     = rs.getLong("from_bank_id");
-        long         toBankId       = rs.getLong("to_bank_id");
-        BigDecimal   amount         = rs.getBigDecimal("amount");
-        Timestamp    txnTs          = rs.getTimestamp("txn_date");
-        String       statusStr      = rs.getString("status");
-        String       subtype        = rs.getString("txn_subtype");   // schema column: txn_subtype
-        Timestamp    createdAt      = rs.getTimestamp("created_at");
-        Timestamp    updatedAt      = rs.getTimestamp("updated_at");
+    // =========================================================================
+    // PRIVATE HELPER
+    // SourceSystem is reconstructed inline from the JOIN — no second query needed
+    // =========================================================================
 
-        LocalDateTime createdLdt = createdAt != null ? createdAt.toLocalDateTime() : null;
-        LocalDateTime updatedLdt = updatedAt != null ? updatedAt.toLocalDateTime() : null;
-        LocalDateTime txnDate    = txnTs     != null ? txnTs.toLocalDateTime()     : LocalDateTime.now();
+    private IncomingTransaction mapRow(ResultSet rs) throws SQLException {
+        Timestamp createdAt   = rs.getTimestamp("created_at");
+        Timestamp updatedAt   = rs.getTimestamp("updated_at");
+        Timestamp ssCreatedAt = rs.getTimestamp("ss_created_at");
+        Timestamp ssUpdatedAt = rs.getTimestamp("ss_updated_at");
 
-        // Lightweight placeholder objects — use actual constructors + BaseEntity setters
-        SourceSystem src = new SourceSystem(SourceType.CBS, null, true);
-        src.setId(sourceSystemId);
-        src.setCreatedAt(createdLdt);
-        src.setUpdatedAt(updatedLdt);
+        SourceSystem sourceSystem = new SourceSystem(
+                rs.getLong("ss_id"),
+                ssCreatedAt != null ? ssCreatedAt.toLocalDateTime() : null,
+                ssUpdatedAt != null ? ssUpdatedAt.toLocalDateTime() : null,
+                SourceType.valueOf(rs.getString("system_code")),
+                rs.getString("file_path"),
+                rs.getBoolean("is_active")
+        );
 
-        Bank fromBank = new Bank(String.valueOf(fromBankId), "Bank " + fromBankId, null, true);
-        fromBank.setId(fromBankId);
-
-        Bank toBank = new Bank(String.valueOf(toBankId), "Bank " + toBankId, null, true);
-        toBank.setId(toBankId);
-
-        ChannelType       channel = channelStr != null ? ChannelType.valueOf(channelStr)      : ChannelType.INTERNAL;
-        TransactionStatus status  = statusStr  != null ? TransactionStatus.valueOf(statusStr) : TransactionStatus.INITIATED;
-
-        // settlement_batch_id is BIGINT in DB — read as long, convert to String for entity
-        long   batchIdLong = rs.getLong("settlement_batch_id");
-        String batchId     = rs.wasNull() ? null : String.valueOf(batchIdLong);
-
-        Transaction txn = switch (subtype != null ? subtype : "") {
-            case "CreditTransaction" -> new CreditTransaction(
-                    src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
-                    rs.getLong("credit_account_id"));
-
-            case "DebitTransaction" -> new DebitTransaction(
-                    src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
-                    rs.getLong("debit_account_id"));
-
-            case "ReversalTransaction" -> new ReversalTransaction(
-                    src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
-                    rs.getLong("original_transaction_id"),
-                    rs.getString("reversal_reason"));
-
-            default -> new InterBankTransaction(
-                    src, sourceSystemId, channel, fromBank, toBank,
-                    amount, txnDate, status, fromBankId, toBankId,
-                    rs.getLong("nostro_account_id"));
-        };
-
-        txn.setId(id);
-        txn.setSettlementBatchId(batchId);
-        txn.setCreatedAt(createdLdt);
-        txn.setUpdatedAt(updatedLdt);
+        IncomingTransaction txn = new IncomingTransaction(
+                rs.getLong("id"),
+                createdAt != null ? createdAt.toLocalDateTime() : null,
+                updatedAt != null ? updatedAt.toLocalDateTime() : null,
+                rs.getLong("source_system_id"),
+                TransactionType.valueOf(rs.getString("txn_type")),
+                rs.getBigDecimal("amount"),
+                rs.getTimestamp("ingest_timestamp").toLocalDateTime(),
+                ProcessingStatus.valueOf(rs.getString("processing_status")),
+                sourceSystem,
+                rs.getString("batch_id")
+        );
         return txn;
     }
 }
