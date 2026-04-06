@@ -9,19 +9,19 @@ public class Account extends BaseEntity {
 	private String accountNumber;
 	private String accountType;
 	private String bankId;
-	private BigDecimal amount;
+	private BigDecimal balance;
 	private String status;
 	private List<IncomingTransaction> transactions;
 
 	public Account(long id, LocalDateTime createdAt, LocalDateTime updatedAt, String customerId, String accountNumber,
-			String accountType, String bankId, BigDecimal amount, String status,
+			String accountType, String bankId, BigDecimal balance, String status,
 			List<IncomingTransaction> transactions) {
 		super(id, createdAt, updatedAt);
 		this.customerId = customerId;
 		this.accountNumber = accountNumber;
 		this.accountType = accountType;
 		this.bankId = bankId;
-		this.amount = amount;
+		this.balance = balance;
 		this.status = status;
 		this.transactions = transactions;
 	}
@@ -39,7 +39,7 @@ public class Account extends BaseEntity {
 	}
 
 	public void setAccountNumber(String accountNumber) {
-		accountNumber = accountNumber;
+		this.accountNumber = accountNumber;
 	}
 
 	public String getAccountType() {
@@ -58,12 +58,12 @@ public class Account extends BaseEntity {
 		this.bankId = bankId;
 	}
 
-	public BigDecimal getAmount() {
-		return amount;
+	public BigDecimal getBalance() {
+		return balance;
 	}
 
-	public void setAmount(BigDecimal amount) {
-		this.amount = amount;
+	public void setBalance(BigDecimal balance) {
+		this.balance = balance;
 	}
 
 	public String getStatus() {
