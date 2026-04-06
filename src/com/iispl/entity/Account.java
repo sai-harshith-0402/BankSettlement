@@ -5,16 +5,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class Account extends BaseEntity {
-	private String customerId;
+	private long customerId;
 	private String accountNumber;
 	private String accountType;
-	private String bankId;
+	private long bankId;
 	private BigDecimal balance;
 	private String status;
 	private List<IncomingTransaction> transactions;
 
-	public Account(long id, LocalDateTime createdAt, LocalDateTime updatedAt, String customerId, String accountNumber,
-			String accountType, String bankId, BigDecimal balance, String status,
+	public Account(long id, LocalDateTime createdAt, LocalDateTime updatedAt, long customerId, String accountNumber,
+			String accountType, long bankId, BigDecimal balance, String status,
 			List<IncomingTransaction> transactions) {
 		super(id, createdAt, updatedAt);
 		this.customerId = customerId;
@@ -26,11 +26,11 @@ public class Account extends BaseEntity {
 		this.transactions = transactions;
 	}
 
-	public String getCustomerId() {
+	public long getCustomerId() {
 		return customerId;
 	}
 
-	public void setCustomerId(String customerId) {
+	public void setCustomerId(long customerId) {
 		this.customerId = customerId;
 	}
 
@@ -50,11 +50,11 @@ public class Account extends BaseEntity {
 		this.accountType = accountType;
 	}
 
-	public String getBankId() {
+	public long getBankId() {
 		return bankId;
 	}
 
-	public void setBankId(String bankId) {
+	public void setBankId(long bankId) {
 		this.bankId = bankId;
 	}
 
