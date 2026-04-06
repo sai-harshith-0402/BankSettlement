@@ -15,7 +15,6 @@ public class AuditLog {
 	private String status;
 	private BigDecimal amount;
 
-	// Parameterized Constructor
 	public AuditLog(long logId, LocalDateTime timestamp, String correlationId, String transactionId, String serviceName,
 			String operation, long accountId, String status, BigDecimal amount) {
 

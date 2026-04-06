@@ -18,7 +18,7 @@ public class Account extends BaseEntity {
 			List<IncomingTransaction> transactions) {
 		super(id, createdAt, updatedAt);
 		this.customerId = customerId;
-		accountNumber = accountNumber;
+		this.accountNumber = accountNumber;
 		this.accountType = accountType;
 		this.bankId = bankId;
 		this.amount = amount;

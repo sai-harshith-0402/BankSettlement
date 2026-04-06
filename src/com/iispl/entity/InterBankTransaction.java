@@ -3,35 +3,33 @@ package com.iispl.entity;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.iispl.enums.ChannelType;
 import com.iispl.enums.ProcessingStatus;
 import com.iispl.enums.TransactionType;
 
 public class InterBankTransaction extends IncomingTransaction {
 
 	private long nostroAccountId;
-	private String clearingHouse;
-
+	private long vostroAccountId;
 	public InterBankTransaction(long incomingTnxId, SourceSystem sourceSystem, long sourceSystemId,
-			TransactionType transactionType, long fromAccountId, long toAccountId, String fromBankName,
-			String toBankName, BigDecimal amount, ProcessingStatus processingStatus, LocalDateTime ingestionTimeStamp,
-			String batchId, long nostroAccountId, String clearingHouse) {
-		super(incomingTnxId, sourceSystem, sourceSystemId, transactionType, fromAccountId, toAccountId, fromBankName,
-				toBankName, amount, processingStatus, ingestionTimeStamp, batchId);
+			TransactionType transactionType, ChannelType channelType, String fromBankName, String toBankName,
+			BigDecimal amount, ProcessingStatus processingStatus, LocalDateTime ingestionTimeStamp, String batchId,
+			long nostroAccountId, long vostroAccountId) {
+		super(incomingTnxId, sourceSystem, sourceSystemId, transactionType, channelType, fromBankName, toBankName,
+				amount, processingStatus, ingestionTimeStamp, batchId);
 		this.nostroAccountId = nostroAccountId;
-		this.clearingHouse = clearingHouse;
+		this.vostroAccountId = vostroAccountId;
 	}
-
 	public long getNostroAccountId() {
 		return nostroAccountId;
 	}
-
-	public String getClearingHouse() {
-		return clearingHouse;
+	public void setNostroAccountId(long nostroAccountId) {
+		this.nostroAccountId = nostroAccountId;
 	}
-
-	@Override
-	public String toString() {
-		return "InterBankTransaction{" + "nostroAccountId=" + nostroAccountId + ", clearingHouse='" + clearingHouse
-				+ '\'' + '}';
+	public long getVostroAccountId() {
+		return vostroAccountId;
+	}
+	public void setVostroAccountId(long vostroAccountId) {
+		this.vostroAccountId = vostroAccountId;
 	}
 }
