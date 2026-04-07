@@ -11,16 +11,18 @@ public class Bank extends BaseEntity {
 	private String bankCode;
 	private String bankName;
 	private String ifscCode;
+	private boolean activeStatus;
 	private List<Customer> customers;
 
-	public Bank(long id, LocalDateTime createdAt, LocalDateTime updatedAt, String bankCode, String bankName,
-			String ifscCode, List<Customer> customers) {
+	
 
+	public Bank(long id, LocalDateTime createdAt, LocalDateTime updatedAt, String bankCode, String bankName,
+			String ifscCode, boolean activeStatus) {
 		super(id, createdAt, updatedAt);
 		this.bankCode = bankCode;
 		this.bankName = bankName;
 		this.ifscCode = ifscCode;
-		this.customers = customers;
+		this.activeStatus = activeStatus;
 	}
 
 	public String getBankCode() {
@@ -39,11 +41,11 @@ public class Bank extends BaseEntity {
 		this.bankName = bankName;
 	}
 
-	public String getIsfcCode() {
+	public String getIfscCode() {
 		return ifscCode;
 	}
 
-	public void setIsfcCode(String isfcCode) {
+	public void setIfscCode(String ifscCode) {
 		this.ifscCode = ifscCode;
 	}
 
@@ -54,5 +56,15 @@ public class Bank extends BaseEntity {
 	public void setCustomers(List<Customer> customers) {
 		this.customers = customers;
 	}
+
+	public boolean isActive() {
+		return activeStatus;
+	}
+
+	public void setActiveStatus(boolean activeStatus) {
+		this.activeStatus = activeStatus;
+	}
+	
+	
 
 }

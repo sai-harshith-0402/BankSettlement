@@ -203,9 +203,9 @@ public class AccountDaoImpl implements AccountDao {
                 rs.getLong("id"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
                 rs.getTimestamp("updated_at").toLocalDateTime(),
-                rs.getString("account_number"),
-                AccountType.valueOf(rs.getString("account_type")),
                 rs.getLong("customer_id"),
+                rs.getString("account_number"),
+                AccountType.valueOf(rs.getString("account_type")),                
                 rs.getLong("bank_id"),
                 rs.getBigDecimal("balance"),
                 rs.getString("status")

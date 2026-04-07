@@ -4,18 +4,19 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.iispl.enums.AccountType;
+
 public class Account extends BaseEntity {
 	private long customerId;
 	private String accountNumber;
-	private String accountType;
+	private AccountType accountType;
 	private long bankId;
 	private BigDecimal balance;
 	private String status;
 	private List<IncomingTransaction> transactions;
 
 	public Account(long id, LocalDateTime createdAt, LocalDateTime updatedAt, long customerId, String accountNumber,
-			String accountType, long bankId, BigDecimal balance, String status,
-			List<IncomingTransaction> transactions) {
+			AccountType accountType, long bankId, BigDecimal balance, String status) {
 		super(id, createdAt, updatedAt);
 		this.customerId = customerId;
 		this.accountNumber = accountNumber;
@@ -23,7 +24,7 @@ public class Account extends BaseEntity {
 		this.bankId = bankId;
 		this.balance = balance;
 		this.status = status;
-		this.transactions = transactions;
+
 	}
 
 	public long getCustomerId() {
@@ -42,11 +43,11 @@ public class Account extends BaseEntity {
 		this.accountNumber = accountNumber;
 	}
 
-	public String getAccountType() {
+	public AccountType getAccountType() {
 		return accountType;
 	}
 
-	public void setAccountType(String accountType) {
+	public void setAccountType(AccountType accountType) {
 		this.accountType = accountType;
 	}
 
