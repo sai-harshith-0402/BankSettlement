@@ -37,6 +37,10 @@ public class IncomingTransaction {
 	public long getIncomingTnxId() {
 		return incomingTnxId;
 	}
+	
+	public void setIncomingTnxId(long incomingTnxId) {
+		this.incomingTnxId = incomingTnxId;
+	}
 	public SourceSystem getSourceSystem() {
 		return sourceSystem;
 	}

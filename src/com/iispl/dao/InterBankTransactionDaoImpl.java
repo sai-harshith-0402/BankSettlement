@@ -1,295 +1,192 @@
 package com.iispl.dao;
 
-import com.iispl.entity.Bank;
+import com.iispl.connectionpool.ConnectionPool;
 import com.iispl.entity.InterBankTransaction;
 import com.iispl.entity.SourceSystem;
 import com.iispl.enums.ChannelType;
+import com.iispl.enums.ProcessingStatus;
 import com.iispl.enums.SourceType;
 import com.iispl.enums.TransactionStatus;
+import com.iispl.enums.TransactionType;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 public class InterBankTransactionDaoImpl implements InterBankTransactionDao {
 
-    private final Connection connection;
+    DataSource dataSource = ConnectionPool.getDataSource();
 
-    public InterBankTransactionDaoImpl(Connection connection) {
-        this.connection = connection;
-    }
-
-    // SQL constants
-    // InterBankTransaction extends Transaction — all fields live in one table.
-    // fromBank / toBank objects are hydrated by the service layer; only their IDs are persisted.
-    private static final String INSERT =
-            "INSERT INTO interbank_transaction " +
-            "(source_system_id, channel, from_bank_id, to_bank_id, amount, txn_date, " +
-            " status, settlement_batch_id, nostro_account_id, created_at, updated_at) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-
-    private static final String SELECT_COLS =
-            "SELECT t.id, t.source_system_id, t.channel, t.from_bank_id, t.to_bank_id, " +
-            "       t.amount, t.txn_date, t.status, t.settlement_batch_id, " +
-            "       t.nostro_account_id, t.created_at, t.updated_at, " +
-            "       s.id AS ss_id, s.system_code, s.file_path, s.is_active, " +
-            "       s.created_at AS ss_created_at, s.updated_at AS ss_updated_at " +
-            "FROM   interbank_transaction t " +
-            "JOIN   source_system s ON s.id = t.source_system_id";
-
-    private static final String SELECT_ALL = SELECT_COLS;
-
-    private static final String SELECT_BY_ID = SELECT_COLS +
-            " WHERE t.id = ?";
-
-    private static final String SELECT_BY_NOSTRO = SELECT_COLS +
-            " WHERE t.nostro_account_id = ?";
-
-    private static final String SELECT_BY_STATUS = SELECT_COLS +
-            " WHERE t.status = ?";
-
-    private static final String SELECT_BY_DATE_RANGE = SELECT_COLS +
-            " WHERE t.txn_date BETWEEN ? AND ?";
-
-    private static final String UPDATE_BATCH_ID =
-            "UPDATE interbank_transaction SET settlement_batch_id = ?, updated_at = NOW() WHERE id = ?";
-
-    private static final String UPDATE_STATUS =
-            "UPDATE interbank_transaction SET status = ?, updated_at = NOW() WHERE id = ?";
-
-    // =========================================================================
-    // SAVE
-    // =========================================================================
-
+    // Persist a new interbank transaction to DB
     @Override
-    public InterBankTransaction save(InterBankTransaction txn) {
-        try (PreparedStatement ps = connection.prepareStatement(INSERT, Statement.RETURN_GENERATED_KEYS)) {
-
-            ps.setLong(1, txn.getSourceSystemId());
-            ps.setString(2, txn.getChannel().name());
-            ps.setLong(3, txn.getFromBankId());
-            ps.setLong(4, txn.getToBankId());
-            ps.setBigDecimal(5, txn.getAmount());
-            ps.setTimestamp(6, Timestamp.valueOf(txn.getTxnDate()));
-            ps.setString(7, txn.getStatus().name());
-
-            if (txn.getSettlementBatchId() == null) {
-                ps.setNull(8, Types.VARCHAR);
-            } else {
-                ps.setString(8, txn.getSettlementBatchId());
-            }
-
-            ps.setLong(9, txn.getNostroAccountId());
+    public InterBankTransaction save(InterBankTransaction transaction) {
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "insert into inter_bank_transaction values(?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setLong(1, transaction.getIncomingTnxId());
+            ps.setLong(2, transaction.getSourceSystem().getSourceSystemId());
+            ps.setLong(3, transaction.getSourceSystemId());
+            ps.setString(4, transaction.getTransactionType().name());
+            ps.setString(5, transaction.getChannelType().name());
+            ps.setString(6, transaction.getFromBankName());
+            ps.setString(7, transaction.getToBankName());
+            ps.setBigDecimal(8, transaction.getAmount());
+            ps.setString(9, transaction.getProcessingStatus().name());
+            ps.setTimestamp(10, Timestamp.valueOf(transaction.getIngestionTimeStamp()));
+            ps.setString(11, transaction.getBatchId());
+            ps.setLong(12, transaction.getNostroAccountId());
+            ps.setLong(13, transaction.getVostroAccountId());
             ps.executeUpdate();
-
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) {
-                    txn.setId(keys.getLong(1));
-                }
-            }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to save InterBankTransaction: " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        return txn;
+        return transaction;
     }
 
-    // =========================================================================
-    // FIND ALL
-    // =========================================================================
-
+    // Fetch all interbank transactions
     @Override
     public List<InterBankTransaction> findAll() {
         List<InterBankTransaction> list = new ArrayList<>();
-
-        try (PreparedStatement ps = connection.prepareStatement(SELECT_ALL);
-             ResultSet rs = ps.executeQuery()) {
-
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "select * from inter_bank_transaction";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 list.add(mapRow(rs));
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch all InterBankTransactions: " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return list;
     }
 
-    // =========================================================================
-    // FIND BY ID
-    // =========================================================================
-
+    // Fetch by primary key; returns null if not found
     @Override
     public InterBankTransaction findById(long id) {
-        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_ID)) {
-
+        InterBankTransaction transaction = null;
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "select * from inter_bank_transaction where incoming_tnx_id=?";
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setLong(1, id);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapRow(rs);
-                }
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                transaction = mapRow(rs);
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch InterBankTransaction id=" + id + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        return null;
+        return transaction;
     }
 
-    // =========================================================================
-    // UPDATE BATCH ID
-    // =========================================================================
-
+    // Assign or update the settlement batch id on a transaction
     @Override
     public void updateBatchId(long id, String settlementBatchId) {
-        try (PreparedStatement ps = connection.prepareStatement(UPDATE_BATCH_ID)) {
-
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "update inter_bank_transaction set batch_id=? where incoming_tnx_id=?";
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setString(1, settlementBatchId);
             ps.setLong(2, id);
             ps.executeUpdate();
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to update batchId for InterBankTransaction id=" + id + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
-    // =========================================================================
-    // FIND BY NOSTRO ACCOUNT ID
-    // =========================================================================
-
+    // Fetch all interbank transactions linked to a specific nostro account
     @Override
     public List<InterBankTransaction> findByNostroAccountId(long nostroAccountId) {
         List<InterBankTransaction> list = new ArrayList<>();
-
-        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_NOSTRO)) {
-
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "select * from inter_bank_transaction where nostro_account_id=?";
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setLong(1, nostroAccountId);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRow(rs));
-                }
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                list.add(mapRow(rs));
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch InterBankTransactions for nostroAccountId="
-                    + nostroAccountId + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return list;
     }
 
-    // =========================================================================
-    // FIND BY STATUS
-    // =========================================================================
-
+    // Fetch all transactions with a specific status
     @Override
     public List<InterBankTransaction> findByStatus(TransactionStatus status) {
         List<InterBankTransaction> list = new ArrayList<>();
-
-        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_STATUS)) {
-
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "select * from inter_bank_transaction where processing_status=?";
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setString(1, status.name());
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRow(rs));
-                }
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                list.add(mapRow(rs));
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch InterBankTransactions by status="
-                    + status + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return list;
     }
 
-    // =========================================================================
-    // FIND BY DATE RANGE
-    // =========================================================================
-
+    // Fetch all transactions whose txn_date falls within the given range
     @Override
     public List<InterBankTransaction> findByDateRange(LocalDateTime from, LocalDateTime to) {
         List<InterBankTransaction> list = new ArrayList<>();
-
-        try (PreparedStatement ps = connection.prepareStatement(SELECT_BY_DATE_RANGE)) {
-
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "select * from inter_bank_transaction where ingestion_time_stamp between ? and ?";
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setTimestamp(1, Timestamp.valueOf(from));
             ps.setTimestamp(2, Timestamp.valueOf(to));
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRow(rs));
-                }
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                list.add(mapRow(rs));
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch InterBankTransactions in date range: " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return list;
     }
 
-    // =========================================================================
-    // UPDATE STATUS
-    // =========================================================================
-
+    // Update the status of a specific transaction
     @Override
     public void updateStatus(long id, TransactionStatus newStatus) {
-        try (PreparedStatement ps = connection.prepareStatement(UPDATE_STATUS)) {
-
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "update inter_bank_transaction set processing_status=? where incoming_tnx_id=?";
+            PreparedStatement ps = con.prepareStatement(sql);
             ps.setString(1, newStatus.name());
             ps.setLong(2, id);
             ps.executeUpdate();
-
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to update status for InterBankTransaction id=" + id + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
-    // =========================================================================
-    // PRIVATE HELPER
-    // fromBank / toBank objects are hydrated by the service layer — passed as null here.
-    // SourceSystem is reconstructed inline from the JOIN.
-    // =========================================================================
-
-    private InterBankTransaction mapRow(ResultSet rs) throws SQLException {
-        Timestamp createdAt   = rs.getTimestamp("created_at");
-        Timestamp updatedAt   = rs.getTimestamp("updated_at");
-        Timestamp ssCreatedAt = rs.getTimestamp("ss_created_at");
-        Timestamp ssUpdatedAt = rs.getTimestamp("ss_updated_at");
-
+    // Map a ResultSet row to an InterBankTransaction object
+    private InterBankTransaction mapRow(ResultSet rs) throws Exception {
         SourceSystem sourceSystem = new SourceSystem(
-                rs.getLong("ss_id"),
-                ssCreatedAt != null ? ssCreatedAt.toLocalDateTime() : null,
-                ssUpdatedAt != null ? ssUpdatedAt.toLocalDateTime() : null,
-                SourceType.valueOf(rs.getString("system_code")),
-                rs.getString("file_path"),
-                rs.getBoolean("is_active")
+                rs.getLong("source_system_id"),
+                SourceType.valueOf(rs.getString("source_type")),
+                rs.getString("file_path")
         );
-
         return new InterBankTransaction(
-                rs.getLong("id"),
-                createdAt != null ? createdAt.toLocalDateTime() : null,
-                updatedAt != null ? updatedAt.toLocalDateTime() : null,
+                rs.getLong("incoming_tnx_id"),
                 sourceSystem,
                 rs.getLong("source_system_id"),
-                ChannelType.valueOf(rs.getString("channel")),
-                (Bank) null,                                // hydrated by service layer
-                (Bank) null,                                // hydrated by service layer
+                TransactionType.valueOf(rs.getString("transaction_type")),
+                ChannelType.valueOf(rs.getString("channel_type")),
+                rs.getString("from_bank_name"),
+                rs.getString("to_bank_name"),
                 rs.getBigDecimal("amount"),
-                rs.getTimestamp("txn_date").toLocalDateTime(),
-                TransactionStatus.valueOf(rs.getString("status")),
-                rs.getLong("from_bank_id"),
-                rs.getLong("to_bank_id"),
-                rs.getString("settlement_batch_id"),
-                rs.getLong("nostro_account_id")
+                ProcessingStatus.valueOf(rs.getString("processing_status")),
+                rs.getTimestamp("ingestion_time_stamp").toLocalDateTime(),
+                rs.getString("batch_id"),
+                rs.getLong("nostro_account_id"),
+                rs.getLong("vostro_account_id")
         );
     }
 }
