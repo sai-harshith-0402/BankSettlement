@@ -1,6 +1,6 @@
 package com.iispl.exception;
 
-public class AdapterException extends Exception {
+public class AdapterException extends RuntimeException {
 
     private final String sourceSystemType;
 
@@ -27,6 +27,7 @@ public class AdapterException extends Exception {
         super(message + " [SourceSystem: " + sourceSystemType + "]", cause);
         this.sourceSystemType = sourceSystemType;
     }
+    
 
     // =========================================================================
     // GETTER
