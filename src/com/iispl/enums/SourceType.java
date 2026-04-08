@@ -4,8 +4,7 @@ public enum SourceType {
     CBS,
     RTGS,
     SWIFT,
-    NEFT,
-    UPI,
+    NEFTUPI,
     FINTECH,
     INTERNAL
 }
