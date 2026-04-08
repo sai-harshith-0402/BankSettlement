@@ -30,4 +30,6 @@ public interface TransactionAdapter {
      * Keys are pre-populated for all TransactionType values so callers never get NPE.
      */
     Map<TransactionType, List<IncomingTransaction>> segregate(List<IncomingTransaction> transactions);
+    
+    public List<IncomingTransaction> ingest(String filePath);
 }

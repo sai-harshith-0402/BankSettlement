@@ -3,20 +3,20 @@ package com.iispl.entity;
 import java.math.BigDecimal;
 
 public class NPCIBank{
-	private String bankId;
+	private long bankId;
 	private String bankName;
 	private BigDecimal balanceAmount;
 	
-	public NPCIBank(String bankId, String bankName, BigDecimal balanceAmount) {
+	public NPCIBank(long bankId, String bankName, BigDecimal balanceAmount) {
 		this.bankId = bankId;
 		this.bankName = bankName;
 		this.balanceAmount = balanceAmount;
 	}
 	
-	public String getBankId() {
+	public long getBankId() {
 		return bankId;
 	}
-	public void setBankId(String bankId) {
+	public void setBankId(long bankId) {
 		this.bankId = bankId;
 	}
 	public String getBankName() {
