@@ -23,7 +23,7 @@ public class NpciBanksDaoImpl implements NpciBanksDao {
         String sql = "INSERT INTO npci_bank (bank_id, bank_name, balance_amount) VALUES (?, ?, ?)";
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setString(1, npcIBank.getBankId());
+            ps.setLong(1, npcIBank.getBankId());
             ps.setString(2, npcIBank.getBankName());
             ps.setBigDecimal(3, npcIBank.getBalanceAmount());
             ps.executeUpdate();
@@ -157,7 +157,7 @@ public class NpciBanksDaoImpl implements NpciBanksDao {
 
     private NPCIBank mapRow(ResultSet rs) throws SQLException {
         return new NPCIBank(
-            rs.getString("bank_id"),
+            rs.getLong("bank_id"),
             rs.getString("bank_name"),
             rs.getBigDecimal("balance_amount")
         );
