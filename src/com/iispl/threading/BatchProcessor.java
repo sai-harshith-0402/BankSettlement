@@ -1,10 +1,19 @@
 package com.iispl.threading;
 
+import com.iispl.dao.BatchDao;
+import com.iispl.dao.CreditTransactionDao;
+import com.iispl.dao.DebitTransactionDao;
+import com.iispl.dao.InterBankTransactionDao;
+import com.iispl.dao.ReversalTransactionDao;
+import com.iispl.dao.TransactionDao;
 import com.iispl.entity.Batch;
+import com.iispl.entity.CreditTransaction;
+import com.iispl.entity.DebitTransaction;
 import com.iispl.entity.IncomingTransaction;
+import com.iispl.entity.InterBankTransaction;
+import com.iispl.entity.ReversalTransaction;
 import com.iispl.enums.BatchStatus;
 import com.iispl.enums.ChannelType;
-import com.iispl.service.BatchService;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,18 +29,13 @@ import java.util.logging.Logger;
  * BatchProcessor — Consumer + Producer thread (Stage 1 → Stage 2).
  *
  * Consumes IncomingTransactions from transactionQueue.
+ * Saves each transaction to the correct subtype table via DAO.
  * Accumulates them in channel buckets (Map<ChannelType, List<IncomingTransaction>>).
- * When a poison pill arrives (one per SourceSystem), it means one source file
- * is fully ingested — flush that source's transactions into Batches.
- * When all N poison pills are received, push POISON_BATCH to batchQueue
- * and shut down.
+ * On poison pill → flush buckets → create Batches → save each Batch to DB.
+ * When all N poison pills received → push POISON_BATCH → shut down.
  *
- * ReentrantLock usage:
- *   The channelBuckets map is the shared mutable state in this class.
- *   Although BatchProcessor runs as a single thread, the lock is used
- *   explicitly to guard the flush operation — demonstrating correct
- *   critical-section discipline for a reviewer, and making the class
- *   safe if the design ever evolves to multiple BatchProcessor threads.
+ * ReentrantLock guards channelBuckets during accumulate and flush
+ * to ensure thread-safe critical section discipline.
  */
 public class BatchProcessor implements Runnable {
 
@@ -39,29 +43,42 @@ public class BatchProcessor implements Runnable {
 
     private final LinkedBlockingQueue<IncomingTransaction> transactionQueue;
     private final LinkedBlockingQueue<Batch>               batchQueue;
-    private final BatchService                             batchService;
     private final int                                      totalSourceCount;
 
-    // ── ReentrantLock guards the channelBuckets map ────────────────────────────
-    // Ensures flush() and accumulate() never interleave on the same bucket
-    private final ReentrantLock bucketLock = new ReentrantLock();
+    // DAOs for persistence
+    private final BatchDao                 batchDao;
+    private final TransactionDao           transactionDao;
+    private final CreditTransactionDao     creditTransactionDao;
+    private final DebitTransactionDao      debitTransactionDao;
+    private final ReversalTransactionDao   reversalTransactionDao;
+    private final InterBankTransactionDao  interBankTransactionDao;
 
-    // Accumulator: channelType → list of transactions from current source file
-    private final Map<ChannelType, List<IncomingTransaction>> channelBuckets = new HashMap<>();
+    // ReentrantLock guards channelBuckets map
+    private final ReentrantLock                                        bucketLock     = new ReentrantLock();
+    private final Map<ChannelType, List<IncomingTransaction>>          channelBuckets = new HashMap<>();
 
-    // Tracks how many poison pills received (one per completed SourceSystem)
     private int poisonPillsReceived = 0;
 
     public BatchProcessor(
             LinkedBlockingQueue<IncomingTransaction> transactionQueue,
             LinkedBlockingQueue<Batch>               batchQueue,
-            BatchService                             batchService,
-            int                                      totalSourceCount) {
+            int                                      totalSourceCount,
+            BatchDao                                 batchDao,
+            TransactionDao                           transactionDao,
+            CreditTransactionDao                     creditTransactionDao,
+            DebitTransactionDao                      debitTransactionDao,
+            ReversalTransactionDao                   reversalTransactionDao,
+            InterBankTransactionDao                  interBankTransactionDao) {
 
-        this.transactionQueue = transactionQueue;
-        this.batchQueue       = batchQueue;
-        this.batchService     = batchService;
-        this.totalSourceCount = totalSourceCount;
+        this.transactionQueue        = transactionQueue;
+        this.batchQueue              = batchQueue;
+        this.totalSourceCount        = totalSourceCount;
+        this.batchDao                = batchDao;
+        this.transactionDao          = transactionDao;
+        this.creditTransactionDao    = creditTransactionDao;
+        this.debitTransactionDao     = debitTransactionDao;
+        this.reversalTransactionDao  = reversalTransactionDao;
+        this.interBankTransactionDao = interBankTransactionDao;
     }
 
     // =========================================================================
@@ -76,30 +93,30 @@ public class BatchProcessor implements Runnable {
 
         try {
             while (true) {
-                // Blocks until a transaction is available
                 IncomingTransaction txn = transactionQueue.take();
 
                 // ── Poison pill received ───────────────────────────────────────
                 if (txn == PipelineOrchestrator.POISON_TRANSACTION) {
                     poisonPillsReceived++;
-                    logger.info("[BatchProcessor:" + threadName + "] Poison pill received ("
+                    logger.info("[BatchProcessor:" + threadName + "] Poison pill ("
                             + poisonPillsReceived + "/" + totalSourceCount + ")");
 
-                    // One source file is fully ingested — flush its transactions into Batches
+                    // One source file fully ingested — flush into Batches
                     flushBuckets(threadName);
 
-                    // All sources done — push poison batch and exit
                     if (poisonPillsReceived == totalSourceCount) {
                         logger.info("[BatchProcessor:" + threadName
-                                + "] All sources ingested — pushing POISON_BATCH and shutting down.");
+                                + "] All sources done — pushing POISON_BATCH.");
                         batchQueue.put(PipelineOrchestrator.POISON_BATCH);
                         break;
                     }
-
                     continue;
                 }
 
-                // ── Accumulate valid transaction into channel bucket ───────────
+                // ── Save transaction to DB ─────────────────────────────────────
+                saveTransaction(txn, threadName);
+
+                // ── Accumulate into channel bucket ─────────────────────────────
                 accumulateTransaction(txn);
             }
 
@@ -112,16 +129,58 @@ public class BatchProcessor implements Runnable {
     }
 
     // =========================================================================
+    // SAVE TRANSACTION TO DB
+    // Routes to the correct subtype DAO based on instanceof check.
+    // Also saves to the base incoming_transaction table via TransactionDao.
+    // =========================================================================
+
+    private void saveTransaction(IncomingTransaction txn, String threadName) {
+        try {
+            // Save to base table first
+            transactionDao.save(txn);
+
+            // Save to subtype table
+            if (txn instanceof CreditTransaction) {
+                creditTransactionDao.save((CreditTransaction) txn);
+                logger.info("[BatchProcessor:" + threadName + "] Saved CreditTransaction id="
+                        + txn.getIncomingTnxId());
+
+            } else if (txn instanceof DebitTransaction) {
+                debitTransactionDao.save((DebitTransaction) txn);
+                logger.info("[BatchProcessor:" + threadName + "] Saved DebitTransaction id="
+                        + txn.getIncomingTnxId());
+
+            } else if (txn instanceof ReversalTransaction) {
+                reversalTransactionDao.save((ReversalTransaction) txn);
+                logger.info("[BatchProcessor:" + threadName + "] Saved ReversalTransaction id="
+                        + txn.getIncomingTnxId());
+
+            } else if (txn instanceof InterBankTransaction) {
+                interBankTransactionDao.save((InterBankTransaction) txn);
+                logger.info("[BatchProcessor:" + threadName + "] Saved InterBankTransaction id="
+                        + txn.getIncomingTnxId());
+
+            } else {
+                logger.warning("[BatchProcessor:" + threadName + "] Unknown transaction subtype for id="
+                        + txn.getIncomingTnxId() + " — saved to base table only.");
+            }
+
+        } catch (Exception e) {
+            logger.severe("[BatchProcessor:" + threadName + "] Failed to save transaction id="
+                    + txn.getIncomingTnxId() + ": " + e.getMessage());
+        }
+    }
+
+    // =========================================================================
     // ACCUMULATE TRANSACTION
-    // Guarded by ReentrantLock — adds txn to the correct channel bucket
+    // Guarded by ReentrantLock.
     // =========================================================================
 
     private void accumulateTransaction(IncomingTransaction txn) {
         bucketLock.lock();
         try {
-            ChannelType channel = txn.getChannelType();
             channelBuckets
-                    .computeIfAbsent(channel, k -> new ArrayList<>())
+                    .computeIfAbsent(txn.getChannelType(), k -> new ArrayList<>())
                     .add(txn);
         } finally {
             bucketLock.unlock();
@@ -130,8 +189,7 @@ public class BatchProcessor implements Runnable {
 
     // =========================================================================
     // FLUSH BUCKETS
-    // Called when a poison pill arrives — one source file is fully consumed.
-    // Creates one Batch per channel, pushes each to batchQueue, clears buckets.
+    // Creates one Batch per channel, saves each to DB, pushes to batchQueue.
     // Guarded by ReentrantLock.
     // =========================================================================
 
@@ -139,8 +197,7 @@ public class BatchProcessor implements Runnable {
         bucketLock.lock();
         try {
             if (channelBuckets.isEmpty()) {
-                logger.info("[BatchProcessor:" + threadName
-                        + "] No transactions in buckets to flush.");
+                logger.info("[BatchProcessor:" + threadName + "] No transactions to flush.");
                 return;
             }
 
@@ -154,13 +211,11 @@ public class BatchProcessor implements Runnable {
 
                 if (txns.isEmpty()) continue;
 
-                // Derive sourceType from first transaction's sourceSystem
                 String sourceTypeName = txns.get(0).getSourceSystem() != null
                         ? txns.get(0).getSourceSystem().getSourceType().name()
                         : "UNKNOWN";
 
-                String batchId = sourceTypeName + "-" + channel.name()
-                        + "-" + today.toString();
+                String batchId = sourceTypeName + "-" + channel.name() + "-" + today;
 
                 BigDecimal totalAmount = txns.stream()
                         .map(IncomingTransaction::getAmount)
@@ -175,6 +230,27 @@ public class BatchProcessor implements Runnable {
                         txns
                 );
 
+                // ── Persist Batch to DB ────────────────────────────────────────
+                try {
+                    batchDao.saveBatch(batch);
+                    logger.info("[BatchProcessor:" + threadName + "] Batch saved to DB: " + batchId);
+                } catch (Exception e) {
+                    logger.severe("[BatchProcessor:" + threadName
+                            + "] Failed to save batch to DB [" + batchId + "]: " + e.getMessage());
+                }
+
+                // ── Update batchId on each transaction in DB ───────────────────
+                for (IncomingTransaction txn : txns) {
+                    try {
+                        transactionDao.updateBatchId(txn.getIncomingTnxId(), batchId);
+                    } catch (Exception e) {
+                        logger.warning("[BatchProcessor:" + threadName
+                                + "] Failed to update batchId for txn id="
+                                + txn.getIncomingTnxId() + ": " + e.getMessage());
+                    }
+                }
+
+                // ── Push batch to batchQueue for SettlementProcessor ───────────
                 batchQueue.put(batch);
 
                 logger.info("[BatchProcessor:" + threadName + "] Batch flushed → batchQueue"
@@ -184,7 +260,6 @@ public class BatchProcessor implements Runnable {
                         + " | TotalAmount: " + totalAmount);
             }
 
-            // Clear buckets for the next source file's transactions
             channelBuckets.clear();
 
         } finally {

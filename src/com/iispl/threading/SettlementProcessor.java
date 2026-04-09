@@ -1,9 +1,14 @@
 package com.iispl.threading;
 
+import com.iispl.dao.BatchDao;
+import com.iispl.dao.NettingPositionDao;
+import com.iispl.dao.ReconciliationEntryDao;
+import com.iispl.dao.SettlementDao;
 import com.iispl.entity.Batch;
 import com.iispl.entity.NettingPosition;
 import com.iispl.entity.ReconciliationEntry;
 import com.iispl.entity.SettlementResult;
+import com.iispl.enums.BatchStatus;
 import com.iispl.service.NettingService;
 import com.iispl.service.ReconciliationService;
 import com.iispl.service.SettlementService;
@@ -17,14 +22,12 @@ import java.util.logging.Logger;
  *
  * Consumes Batches from batchQueue.
  * For each Batch runs the full settlement pipeline:
- *   1. settlementService.settle(batch)         → SettlementResult
- *   2. nettingService.computeNetting(batch)    → List<NettingPosition>
- *   3. reconciliationService.reconcile(...)    → List<ReconciliationEntry>
+ *   1. settlementService.settle()          → SettlementResult  → saved to DB
+ *   2. batchDao.updateBatchStatus()        → RUNNING → COMPLETED in DB
+ *   3. nettingService.computeNetting()     → List<NettingPosition> → saved to DB
+ *   4. reconciliationService.reconcile()  → List<ReconciliationEntry> → saved to DB
  *
- * Stops when it receives POISON_BATCH from BatchProcessor.
- *
- * No ReentrantLock needed here — single consumer thread, no shared
- * mutable state beyond what the services manage internally.
+ * Stops when POISON_BATCH received.
  */
 public class SettlementProcessor implements Runnable {
 
@@ -35,16 +38,30 @@ public class SettlementProcessor implements Runnable {
     private final NettingService             nettingService;
     private final ReconciliationService      reconciliationService;
 
+    // DAOs for persistence
+    private final BatchDao              batchDao;
+    private final SettlementDao         settlementDao;
+    private final NettingPositionDao    nettingPositionDao;
+    private final ReconciliationEntryDao reconciliationEntryDao;
+
     public SettlementProcessor(
             LinkedBlockingQueue<Batch> batchQueue,
             SettlementService          settlementService,
             NettingService             nettingService,
-            ReconciliationService      reconciliationService) {
+            ReconciliationService      reconciliationService,
+            BatchDao                   batchDao,
+            SettlementDao              settlementDao,
+            NettingPositionDao         nettingPositionDao,
+            ReconciliationEntryDao     reconciliationEntryDao) {
 
-        this.batchQueue            = batchQueue;
-        this.settlementService     = settlementService;
-        this.nettingService        = nettingService;
-        this.reconciliationService = reconciliationService;
+        this.batchQueue             = batchQueue;
+        this.settlementService      = settlementService;
+        this.nettingService         = nettingService;
+        this.reconciliationService  = reconciliationService;
+        this.batchDao               = batchDao;
+        this.settlementDao          = settlementDao;
+        this.nettingPositionDao     = nettingPositionDao;
+        this.reconciliationEntryDao = reconciliationEntryDao;
     }
 
     // =========================================================================
@@ -58,17 +75,14 @@ public class SettlementProcessor implements Runnable {
 
         try {
             while (true) {
-                // Blocks until a batch is available
                 Batch batch = batchQueue.take();
 
-                // ── Poison pill — all batches processed ───────────────────────
                 if (batch == PipelineOrchestrator.POISON_BATCH) {
                     logger.info("[SettlementProcessor:" + threadName
                             + "] POISON_BATCH received — shutting down.");
                     break;
                 }
 
-                // ── Process the batch ─────────────────────────────────────────
                 processBatch(batch, threadName);
             }
 
@@ -82,75 +96,105 @@ public class SettlementProcessor implements Runnable {
     }
 
     // =========================================================================
-    // PROCESS BATCH
-    // Full pipeline: Settle → Net → Reconcile
+    // PROCESS BATCH — Settle → Save → Net → Save → Reconcile → Save
     // =========================================================================
 
     private void processBatch(Batch batch, String threadName) {
         String batchId = batch.getBatchId();
-
-        logger.info("[SettlementProcessor:" + threadName + "] Processing batch: " + batchId);
+        logger.info("[SettlementProcessor:" + threadName + "] Processing: " + batchId);
 
         try {
-            // ── Step 1: Settlement ─────────────────────────────────────────────
+            // ── Step 1: Mark batch RUNNING in DB ──────────────────────────────
+            batchDao.updateBatchStatus(batchId, BatchStatus.RUNNING);
             logger.info("[SettlementProcessor:" + threadName
-                    + "] Step 1 — Settlement | BatchId: " + batchId);
+                    + "] Batch status → RUNNING | BatchId: " + batchId);
 
+            // ── Step 2: Settle ─────────────────────────────────────────────────
+            // NPCIServiceImpl.creditBalance/debitBalance already persists to DB
             SettlementResult result = settlementService.settle(batch);
 
-            logger.info("[SettlementProcessor:" + threadName + "] Settlement done"
-                    + " | BatchId: "       + result.getBatchId()
-                    + " | Status: "        + result.getStatus()
-                    + " | Settled: "       + result.getSettledCount()
-                    + " | Failed: "        + result.getFailedCount()
-                    + " | TotalAmount: "   + result.getTotalSettledAmount()
-                    + " | ProcessedAt: "   + result.getProcessedAt());
-
-            // ── Step 2: Netting ────────────────────────────────────────────────
-            logger.info("[SettlementProcessor:" + threadName
-                    + "] Step 2 — Netting | BatchId: " + batchId);
-
-            List<NettingPosition> positions = nettingService.computeNetting(batch);
-
-            logger.info("[SettlementProcessor:" + threadName + "] Netting done"
-                    + " | Positions: " + positions.size());
-
-            for (NettingPosition pos : positions) {
-                logger.info("[SettlementProcessor:" + threadName + "] NettingPosition"
-                        + " | BankId: "       + pos.getCounterpartyBankId()
-                        + " | GrossDebit: "   + pos.getGrossDebitAmount()
-                        + " | GrossCredit: "  + pos.getGrossCreditAmount()
-                        + " | Net: "          + pos.getNetAmount()
-                        + " | Date: "         + pos.getPositionDate());
+            // ── Step 3: Save SettlementResult to DB ───────────────────────────
+            try {
+                settlementDao.saveSettlement(result);
+                logger.info("[SettlementProcessor:" + threadName
+                        + "] SettlementResult saved | BatchId: " + batchId
+                        + " | Status: "      + result.getStatus()
+                        + " | Settled: "     + result.getSettledCount()
+                        + " | Failed: "      + result.getFailedCount()
+                        + " | Amount: "      + result.getTotalSettledAmount()
+                        + " | ProcessedAt: " + result.getProcessedAt());
+            } catch (Exception e) {
+                logger.severe("[SettlementProcessor:" + threadName
+                        + "] Failed to save SettlementResult: " + e.getMessage());
             }
 
-            // ── Step 3: Reconciliation ─────────────────────────────────────────
-            logger.info("[SettlementProcessor:" + threadName
-                    + "] Step 3 — Reconciliation | BatchId: " + batchId);
+            // ── Step 4: Update Batch status in DB (COMPLETED / PARTIAL / FAILED)
+            try {
+                batchDao.updateBatchStatus(batchId, batch.getBatchStatus());
+                logger.info("[SettlementProcessor:" + threadName
+                        + "] Batch status → " + batch.getBatchStatus()
+                        + " | BatchId: " + batchId);
+            } catch (Exception e) {
+                logger.severe("[SettlementProcessor:" + threadName
+                        + "] Failed to update batch status: " + e.getMessage());
+            }
 
+            // ── Step 5: Netting ────────────────────────────────────────────────
+            List<NettingPosition> positions = nettingService.computeNetting(batch);
+
+            // ── Step 6: Save NettingPositions to DB ───────────────────────────
+            for (NettingPosition position : positions) {
+                try {
+                    nettingPositionDao.saveNettingPosition(position);
+                    logger.info("[SettlementProcessor:" + threadName + "] NettingPosition saved"
+                            + " | BankId: "      + position.getCounterpartyBankId()
+                            + " | GrossDebit: "  + position.getGrossDebitAmount()
+                            + " | GrossCredit: " + position.getGrossCreditAmount()
+                            + " | Net: "         + position.getNetAmount());
+                } catch (Exception e) {
+                    logger.severe("[SettlementProcessor:" + threadName
+                            + "] Failed to save NettingPosition id="
+                            + position.getPositiionId() + ": " + e.getMessage());
+                }
+            }
+
+            // ── Step 7: Reconciliation ─────────────────────────────────────────
             List<ReconciliationEntry> entries =
                     reconciliationService.reconcile(batch, positions);
 
-            logger.info("[SettlementProcessor:" + threadName + "] Reconciliation done"
-                    + " | Entries: " + entries.size());
-
+            // ── Step 8: Save ReconciliationEntries to DB ───────────────────────
             for (ReconciliationEntry entry : entries) {
-                logger.info("[SettlementProcessor:" + threadName + "] ReconciliationEntry"
-                        + " | EntryId: "       + entry.getEntryId()
-                        + " | AccountId: "     + entry.getAccountId()
-                        + " | Expected: "      + entry.getExpectedAmount()
-                        + " | Actual: "        + entry.getActualAmount()
-                        + " | Variance: "      + entry.getVariance()
-                        + " | Status: "        + entry.getReconStatus()
-                        + " | Date: "          + entry.getReconciliationDate());
+                try {
+                    reconciliationEntryDao.saveReconciliationEntry(entry);
+                    logger.info("[SettlementProcessor:" + threadName
+                            + "] ReconciliationEntry saved"
+                            + " | EntryId: "   + entry.getEntryId()
+                            + " | AccountId: " + entry.getAccountId()
+                            + " | Expected: "  + entry.getExpectedAmount()
+                            + " | Actual: "    + entry.getActualAmount()
+                            + " | Variance: "  + entry.getVariance()
+                            + " | Status: "    + entry.getReconStatus());
+                } catch (Exception e) {
+                    logger.severe("[SettlementProcessor:" + threadName
+                            + "] Failed to save ReconciliationEntry id="
+                            + entry.getEntryId() + ": " + e.getMessage());
+                }
             }
 
             logger.info("[SettlementProcessor:" + threadName
-                    + "] Batch fully processed | BatchId: " + batchId);
+                    + "] Batch fully processed and persisted | BatchId: " + batchId);
 
         } catch (Exception e) {
             logger.severe("[SettlementProcessor:" + threadName
                     + "] Error processing batch [" + batchId + "]: " + e.getMessage());
+
+            // Mark batch FAILED in DB on unexpected error
+            try {
+                batchDao.updateBatchStatus(batchId, BatchStatus.FAILED);
+            } catch (Exception ex) {
+                logger.severe("[SettlementProcessor:" + threadName
+                        + "] Also failed to mark batch FAILED: " + ex.getMessage());
+            }
         }
     }
 }
