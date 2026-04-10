@@ -907,29 +907,30 @@ public class BankSettlementUtility {
 	// =========================================================================
 
 	private static void opsRunNetting() {
-		System.out.println("\n=== RUN NETTING ===");
-		List<Batch> completed = batchDao.findBatchesByStatus(BatchStatus.COMPLETED);
-		if (completed.isEmpty()) {
-			System.out.println("[INFO] No COMPLETED batches available for netting.");
-			return;
-		}
-		System.out.println("[INFO] Found " + completed.size() + " COMPLETED batch(es).\n");
 
-		int totalPositions = 0;
-		for (Batch batch : completed) {
-			System.out.println("[INFO] Netting batch: " + batch.getBatchId());
-			try {
-				List<NettingPosition> positions = nettingService.computeNetting(batch);
-				for (NettingPosition pos : positions) {
-					nettingPositionDao.saveNettingPosition(pos);
-					printNettingPosition(pos);
-					totalPositions++;
-				}
-			} catch (Exception e) {
-				System.out.println("[ERROR] Netting failed for " + batch.getBatchId() + ": " + e.getMessage());
-			}
-		}
-		System.out.println("\n[SUMMARY] Total netting positions saved: " + totalPositions);
+	    System.out.println("\n=== RUN NETTING ===");
+
+	    List<Batch> completed = batchDao.findBatchesByStatus(BatchStatus.COMPLETED);
+
+	    if (completed.isEmpty()) {
+	        System.out.println("[INFO] No COMPLETED batches available for netting.");
+	        return;
+	    }
+
+	    int totalPositions = 0;
+	    for (Batch batch : completed) {
+	        System.out.println("[INFO] Netting batch: " + batch.getBatchId());
+	        try {
+	            List<NettingPosition> positions = nettingService.computeNetting(batch);
+	            System.out.println("[INFO] Saved " + positions.size() + " netting records to DB");
+	            positions.forEach(BankSettlementUtility::printNettingPosition);
+	            totalPositions += positions.size();
+	        } catch (Exception e) {
+	            System.out.println("[ERROR] Netting failed for batch "
+	                    + batch.getBatchId() + ": " + e.getMessage());
+	        }
+	    }
+	    System.out.println("\n[SUMMARY] Total netting positions saved: " + totalPositions);
 	}
 
 	private static void opsViewAllNetting() {
@@ -948,32 +949,35 @@ public class BankSettlementUtility {
 	// =========================================================================
 
 	private static void opsRunReconciliation() {
-		System.out.println("\n=== RUN RECONCILIATION ===");
-		List<Batch> completed = batchDao.findBatchesByStatus(BatchStatus.COMPLETED);
-		if (completed.isEmpty()) {
-			System.out.println("[INFO] No COMPLETED batches available for reconciliation.");
-			return;
-		}
-		System.out.println("[INFO] Found " + completed.size() + " COMPLETED batch(es).\n");
+	    System.out.println("\n=== RUN RECONCILIATION ===");
 
-		int totalEntries = 0;
-		for (Batch batch : completed) {
-			System.out.println("[INFO] Reconciling batch: " + batch.getBatchId());
-			try {
-				// Re-use netting positions computed on the fly from the batch
-				List<NettingPosition> positions = nettingService.computeNetting(batch);
-				List<ReconciliationEntry> entries = reconciliationService.reconcile(batch, positions);
-				for (ReconciliationEntry entry : entries) {
-					reconciliationEntryDao.saveReconciliationEntry(entry);
-					printReconciliationEntry(entry);
+	    List<Batch> completed = batchDao.findBatchesByStatus(BatchStatus.COMPLETED);
+	    if (completed.isEmpty()) {
+	        System.out.println("[INFO] No COMPLETED batches available for reconciliation.");
+	        return;
+	    }
+	    System.out.println("[INFO] Found " + completed.size() + " COMPLETED batch(es).\n");
 
-					totalEntries++;
-				}
-			} catch (Exception e) {
-				System.out.println("[ERROR] Reconciliation failed for " + batch.getBatchId() + ": " + e.getMessage());
-			}
-		}
-		System.out.println("\n[SUMMARY] Total reconciliation entries saved: " + totalEntries);
+	    int totalEntries = 0;
+	    for (Batch batch : completed) {
+	        System.out.println("[INFO] Reconciling batch: " + batch.getBatchId());
+	        try {
+	            List<NettingPosition> positions = nettingService.computeNetting(batch);
+
+	            // FIX: reconcile() saves each entry to DB internally.
+	            // Do NOT call reconciliationEntryDao.saveReconciliationEntry() here again —
+	            // that was causing a primary-key violation on every entry.
+	            List<ReconciliationEntry> entries = reconciliationService.reconcile(batch, positions);
+	            for (ReconciliationEntry entry : entries) {
+	                printReconciliationEntry(entry);   // display only — already saved inside reconcile()
+	                totalEntries++;
+	            }
+	        } catch (Exception e) {
+	            System.out.println("[ERROR] Reconciliation failed for "
+	                    + batch.getBatchId() + ": " + e.getMessage());
+	        }
+	    }
+	    System.out.println("\n[SUMMARY] Total reconciliation entries saved: " + totalEntries);
 	}
 
 	private static void opsViewAllReconciliation() {

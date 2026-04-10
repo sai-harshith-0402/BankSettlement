@@ -1,7 +1,6 @@
 package com.iispl.dao;
 
 import com.iispl.connectionpool.ConnectionPool;
-import com.iispl.dao.NettingPositionDao;
 import com.iispl.entity.NettingPosition;
 
 import java.math.BigDecimal;
@@ -20,21 +19,25 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
     // -----------------------------------------------------------------------
 
     @Override
-    public void saveNettingPosition(NettingPosition nettingPosition) {
+    public void saveNettingPosition(NettingPosition p) {
         String sql = "INSERT INTO netting_position "
-                   + "(position_id, counterparty_bank_id, gross_debit_amount, gross_credit_amount, net_amount, position_date) "
-                   + "VALUES (?, ?, ?, ?, ?, ?)";
+                   + "(position_id, batch_id, bank_name, counterparty_bank_id, "
+                   + " gross_debit_amount, gross_credit_amount, net_amount, position_date) "
+                   + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1, nettingPosition.getPositiionId());
-            ps.setLong(2, nettingPosition.getCounterpartyBankId());
-            ps.setBigDecimal(3, nettingPosition.getGrossDebitAmount());
-            ps.setBigDecimal(4, nettingPosition.getGrossCreditAmount());
-            ps.setBigDecimal(5, nettingPosition.getNetAmount());
-            ps.setObject(6, nettingPosition.getPositionDate());
+            ps.setLong(1,       p.getPositiionId());
+            ps.setString(2,     p.getBatchId());
+            ps.setString(3,     p.getBankName());
+            ps.setLong(4,       p.getCounterpartyBankId());
+            ps.setBigDecimal(5, p.getGrossDebitAmount());
+            ps.setBigDecimal(6, p.getGrossCreditAmount());
+            ps.setBigDecimal(7, p.getNetAmount());
+            ps.setObject(8,     p.getPositionDate());
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to save netting position [" + nettingPosition.getPositiionId() + "]: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to save netting position [" + p.getPositiionId() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -46,7 +49,8 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
             ps.setLong(1, positionId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to delete netting position [" + positionId + "]: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to delete netting position [" + positionId + "]: " + e.getMessage(), e);
         }
     }
 
@@ -56,23 +60,27 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
 
     @Override
     public List<NettingPosition> findAllNettingPositions() {
-        String sql = "SELECT position_id, counterparty_bank_id, gross_debit_amount, "
-                   + "gross_credit_amount, net_amount, position_date FROM netting_position";
+        String sql = "SELECT position_id, batch_id, bank_name, counterparty_bank_id, "
+                   + "gross_debit_amount, gross_credit_amount, net_amount, position_date "
+                   + "FROM netting_position";
         List<NettingPosition> positions = new ArrayList<>();
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) positions.add(mapRow(rs));
+            while (rs.next())
+                positions.add(mapRow(rs));
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to fetch all netting positions: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to fetch all netting positions: " + e.getMessage(), e);
         }
         return positions;
     }
 
     @Override
     public NettingPosition findNettingPositionById(long positionId) {
-        String sql = "SELECT position_id, counterparty_bank_id, gross_debit_amount, "
-                   + "gross_credit_amount, net_amount, position_date FROM netting_position WHERE position_id = ?";
+        String sql = "SELECT position_id, batch_id, bank_name, counterparty_bank_id, "
+                   + "gross_debit_amount, gross_credit_amount, net_amount, position_date "
+                   + "FROM netting_position WHERE position_id = ?";
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setLong(1, positionId);
@@ -80,16 +88,17 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
                 if (rs.next()) return mapRow(rs);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find netting position [" + positionId + "]: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to find netting position [" + positionId + "]: " + e.getMessage(), e);
         }
         return null;
     }
 
     @Override
     public List<NettingPosition> findPositionsByCounterpartyBank(long counterpartyBankId) {
-        String sql = "SELECT position_id, counterparty_bank_id, gross_debit_amount, "
-                   + "gross_credit_amount, net_amount, position_date FROM netting_position "
-                   + "WHERE counterparty_bank_id = ?";
+        String sql = "SELECT position_id, batch_id, bank_name, counterparty_bank_id, "
+                   + "gross_debit_amount, gross_credit_amount, net_amount, position_date "
+                   + "FROM netting_position WHERE counterparty_bank_id = ?";
         List<NettingPosition> positions = new ArrayList<>();
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -98,16 +107,17 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
                 while (rs.next()) positions.add(mapRow(rs));
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find positions by counterparty bank [" + counterpartyBankId + "]: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to find positions by counterparty bank: " + e.getMessage(), e);
         }
         return positions;
     }
 
     @Override
     public List<NettingPosition> findPositionsByDateRange(LocalDateTime from, LocalDateTime to) {
-        String sql = "SELECT position_id, counterparty_bank_id, gross_debit_amount, "
-                   + "gross_credit_amount, net_amount, position_date FROM netting_position "
-                   + "WHERE position_date BETWEEN ? AND ?";
+        String sql = "SELECT position_id, batch_id, bank_name, counterparty_bank_id, "
+                   + "gross_debit_amount, gross_credit_amount, net_amount, position_date "
+                   + "FROM netting_position WHERE position_date BETWEEN ? AND ?";
         List<NettingPosition> positions = new ArrayList<>();
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
@@ -117,16 +127,17 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
                 while (rs.next()) positions.add(mapRow(rs));
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find positions by date range: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to find positions by date range: " + e.getMessage(), e);
         }
         return positions;
     }
 
     @Override
     public NettingPosition findPositionByCounterpartyAndDate(long counterpartyBankId, LocalDateTime positionDate) {
-        String sql = "SELECT position_id, counterparty_bank_id, gross_debit_amount, "
-                   + "gross_credit_amount, net_amount, position_date FROM netting_position "
-                   + "WHERE counterparty_bank_id = ? AND position_date = ?";
+        String sql = "SELECT position_id, batch_id, bank_name, counterparty_bank_id, "
+                   + "gross_debit_amount, gross_credit_amount, net_amount, position_date "
+                   + "FROM netting_position WHERE counterparty_bank_id = ? AND position_date = ?";
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setLong(1, counterpartyBankId);
@@ -135,14 +146,11 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
                 if (rs.next()) return mapRow(rs);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to find position by counterparty and date: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to find position by counterparty and date: " + e.getMessage(), e);
         }
         return null;
     }
-
-    // -----------------------------------------------------------------------
-    // Update operations
-    // -----------------------------------------------------------------------
 
     @Override
     public void updateNettingAmounts(long positionId, BigDecimal grossDebit,
@@ -158,17 +166,20 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
             ps.setLong(4, positionId);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Failed to update netting amounts for position [" + positionId + "]: " + e.getMessage(), e);
+            throw new RuntimeException(
+                "Failed to update netting amounts [" + positionId + "]: " + e.getMessage(), e);
         }
     }
 
     // -----------------------------------------------------------------------
-    // Row mapper
+    // Row mapper — reads all 8 columns, matches 8-param constructor exactly
     // -----------------------------------------------------------------------
 
     private NettingPosition mapRow(ResultSet rs) throws SQLException {
         return new NettingPosition(
             rs.getLong("position_id"),
+            rs.getString("batch_id"),
+            rs.getString("bank_name"),
             rs.getLong("counterparty_bank_id"),
             rs.getBigDecimal("gross_debit_amount"),
             rs.getBigDecimal("gross_credit_amount"),
