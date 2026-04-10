@@ -154,7 +154,7 @@ public class SettlementProcessor implements Runnable {
                 } catch (Exception e) {
                     logger.severe("[SettlementProcessor:" + threadName
                             + "] Failed to save NettingPosition id="
-                            + position.getPositiionId() + ": " + e.getMessage());
+                            + position.getPositionId() + ": " + e.getMessage());
                 }
             }
 

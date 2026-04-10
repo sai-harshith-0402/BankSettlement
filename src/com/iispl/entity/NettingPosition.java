@@ -28,12 +28,11 @@ public class NettingPosition {
 		this.positionDate = positionDate;
 	}
 
-	// kept original typo "getPositiionId" so nothing else in your project breaks
-	public long getPositiionId() {
+	public long getPositionId() {
 		return positionId;
 	}
 
-	public void setPositiionId(long positionId) {
+	public void setPositionId(long positionId) {
 		this.positionId = positionId;
 	}
 

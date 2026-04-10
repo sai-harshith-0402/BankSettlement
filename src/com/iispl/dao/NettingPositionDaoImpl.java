@@ -26,7 +26,7 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
-            ps.setLong(1,       p.getPositiionId());
+            ps.setLong(1,       p.getPositionId());
             ps.setString(2,     p.getBatchId());
             ps.setString(3,     p.getBankName());
             ps.setLong(4,       p.getCounterpartyBankId());
@@ -37,7 +37,7 @@ public class NettingPositionDaoImpl implements NettingPositionDao {
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(
-                "Failed to save netting position [" + p.getPositiionId() + "]: " + e.getMessage(), e);
+                "Failed to save netting position [" + p.getPositionId() + "]: " + e.getMessage(), e);
         }
     }
 

@@ -744,12 +744,6 @@ public class BankSettlementUtility {
 				opsViewAllNetting();
 				break;
 			case 8:
-				opsRunReconciliation();
-				break;
-			case 9:
-				opsViewAllReconciliation();
-				break;
-			case 10:
 				back = true;
 				break;
 			default:
@@ -776,11 +770,8 @@ public class BankSettlementUtility {
 		System.out.println("|  6.  Run Netting           (all COMPLETED batches)       |");
 		System.out.println("|  7.  View All Netting Positions                          |");
 		System.out.println("|                                                          |");
-		System.out.println("|  RECONCILIATION                                          |");
-		System.out.println("|  8.  Run Reconciliation    (all COMPLETED batches)       |");
-		System.out.println("|  9.  View All Reconciliation Entries                     |");
 		System.out.println("|                                                          |");
-		System.out.println("| 10.  Back to Main Menu                                   |");
+		System.out.println("| 8.  Back to Main Menu                                   |");
 		System.out.println("+-----------------------------------------------------------+");
 	}
 
@@ -1018,7 +1009,7 @@ public class BankSettlementUtility {
 
 	private static void printNettingPosition(NettingPosition p) {
 		System.out.println("  +- Netting Position --------------------------------------");
-		System.out.println("  | Position ID  : " + p.getPositiionId());
+		System.out.println("  | Position ID  : " + p.getPositionId());
 		System.out.println("  | Counterparty : " + p.getCounterpartyBankId());
 		System.out.println("  | Gross Debit  : " + p.getGrossDebitAmount());
 		System.out.println("  | Gross Credit : " + p.getGrossCreditAmount());
