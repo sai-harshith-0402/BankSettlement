@@ -118,7 +118,7 @@ public class NpciBanksDaoImpl implements NpciBanksDao {
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setBigDecimal(1, newBalance);
-            ps.setString(2, bankId);
+            ps.setLong(2, Long.parseLong(bankId)); 
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to update balance for bank [" + bankId + "]: " + e.getMessage(), e);
@@ -131,7 +131,7 @@ public class NpciBanksDaoImpl implements NpciBanksDao {
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setBigDecimal(1, amount);
-            ps.setString(2, bankId);
+            ps.setLong(2, Long.parseLong(bankId)); 
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to credit balance for bank [" + bankId + "]: " + e.getMessage(), e);
@@ -144,7 +144,7 @@ public class NpciBanksDaoImpl implements NpciBanksDao {
         try (Connection con = ConnectionPool.getDataSource().getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setBigDecimal(1, amount);
-            ps.setString(2, bankId);
+            ps.setLong(2, Long.parseLong(bankId)); 
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to debit balance for bank [" + bankId + "]: " + e.getMessage(), e);

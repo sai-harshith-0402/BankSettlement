@@ -7,6 +7,7 @@ import com.iispl.enums.*;
 import com.iispl.exception.AdapterException;
 import com.iispl.ingestion.AdapterRegistry;
 import com.iispl.service.*;
+import com.iispl.threading.PipelineOrchestrator;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -41,6 +42,17 @@ public class BankSettlementUtility {
 	private static final NettingPositionDao nettingPositionDao;
 	private static final ReconciliationEntryDao reconciliationEntryDao;
 
+	private static final CreditTransactionDao creditTransactionDao;
+	private static final DebitTransactionDao debitTransactionDao;
+	private static final ReversalTransactionDao reversalTransactionDao;
+	private static final InterBankTransactionDao interBankTransactionDao;
+
+	// =========================================================================
+	// PIPELINE ORCHESTRATOR
+	// =========================================================================
+
+	private static PipelineOrchestrator pipelineOrchestrator;
+
 	// =========================================================================
 	// SERVICES
 	// =========================================================================
@@ -74,6 +86,11 @@ public class BankSettlementUtility {
 			nettingPositionDao = new NettingPositionDaoImpl();
 			reconciliationEntryDao = new ReconciliationEntryDaoImpl();
 
+			creditTransactionDao    = new CreditTransactionDaoImpl();
+			debitTransactionDao     = new DebitTransactionDaoImpl();
+			reversalTransactionDao  = new ReversalTransactionDaoImpl();
+			interBankTransactionDao = new InterBankTransactionDaoImpl();
+
 			List<NPCIBank> bankList = npciBanksDao.findAllNPCIBanks();
 			NPCI npci = new NPCI(bankList);
 			AdapterRegistry adapterRegistry = new AdapterRegistry();
@@ -83,6 +100,24 @@ public class BankSettlementUtility {
 			settlementService = new SettlementServiceImpl(npciService);
 			nettingService = new NettingServiceImpl(npciService);
 			reconciliationService = new ReconciliationServiceImpl(npciService);
+
+			// Wire PipelineOrchestrator — lazily constructed here; start() called on demand
+			pipelineOrchestrator = new PipelineOrchestrator(
+					sourceSystemDao.findAllActive(),
+					adapterRegistry,
+					settlementService,
+					nettingService,
+					reconciliationService,
+					batchDao,
+					transactionDao,
+					creditTransactionDao,
+					debitTransactionDao,
+					reversalTransactionDao,
+					interBankTransactionDao,
+					settlementDao,
+					nettingPositionDao,
+					reconciliationEntryDao
+			);
 
 		} catch (SQLException e) {
 			throw new RuntimeException("[FATAL] DB initialisation failed: " + e.getMessage(), e);
@@ -744,6 +779,9 @@ public class BankSettlementUtility {
 				opsViewAllNetting();
 				break;
 			case 8:
+				opsRunFullPipeline();
+				break;
+			case 9:
 				back = true;
 				break;
 			default:
@@ -770,8 +808,11 @@ public class BankSettlementUtility {
 		System.out.println("|  6.  Run Netting           (all COMPLETED batches)       |");
 		System.out.println("|  7.  View All Netting Positions                          |");
 		System.out.println("|                                                          |");
+		System.out.println("|  PIPELINE                                                |");
+		System.out.println("|  8.  Run Full Pipeline     (threaded: ingest → batch →   |");
+		System.out.println("|                             settle → net → reconcile)     |");
 		System.out.println("|                                                          |");
-		System.out.println("| 8.  Back to Main Menu                                   |");
+		System.out.println("| 9.  Back to Main Menu                                   |");
 		System.out.println("+-----------------------------------------------------------+");
 	}
 
@@ -933,6 +974,32 @@ public class BankSettlementUtility {
 		}
 		System.out.println("[INFO] Total: " + list.size());
 		list.forEach(BankSettlementUtility::printNettingPosition);
+	}
+
+	// =========================================================================
+	// 2-D FULL THREADED PIPELINE
+	// =========================================================================
+
+	private static void opsRunFullPipeline() {
+		System.out.println("\n=== RUN FULL THREADED PIPELINE ===");
+		System.out.println("[INFO] Stages: Ingest → Batch → Settle → Net → Reconcile");
+
+		List<SourceSystem> activeSources = sourceSystemDao.findAllActive();
+		if (activeSources.isEmpty()) {
+			System.out.println("[WARN] No active source systems found. Pipeline aborted.");
+			return;
+		}
+		System.out.println("[INFO] Active source systems: " + activeSources.size());
+		activeSources.forEach(ss ->
+				System.out.println("       • " + ss.getSourceType() + " → " + ss.getFilePath()));
+		System.out.println("[INFO] Launching pipeline threads...\n");
+
+		try {
+			pipelineOrchestrator.start();
+			System.out.println("\n[SUCCESS] Full pipeline completed. All records persisted to DB.");
+		} catch (Exception e) {
+			System.out.println("[ERROR] Pipeline failed: " + e.getMessage());
+		}
 	}
 
 	// =========================================================================
