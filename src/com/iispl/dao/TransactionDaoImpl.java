@@ -24,19 +24,53 @@ public class TransactionDaoImpl implements TransactionDao {
     @Override
     public IncomingTransaction save(IncomingTransaction transaction) {
         try (Connection con = dataSource.getConnection()) {
-            String sql = "insert into incoming_transaction values(?,?,?,?,?,?,?,?,?,?,?)";
+            // FIX: use explicit column names so insert is independent of physical column order in the table
+            String sql = "INSERT INTO incoming_transaction "
+                       + "(incoming_tnx_id, source_system_id, source_type, transaction_type, "
+                       + "channel_type, from_bank_name, to_bank_name, amount, "
+                       + "processing_status, ingestion_time_stamp, batch_id) "
+                       + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             PreparedStatement ps = con.prepareStatement(sql);
-            ps.setLong(1, transaction.getIncomingTnxId());
-            ps.setLong(2, transaction.getSourceSystem().getSourceSystemId());
-            ps.setLong(3, transaction.getSourceSystemId());
-            ps.setString(4, transaction.getTransactionType().name());
-            ps.setString(5, transaction.getChannelType().name());
-            ps.setString(6, transaction.getFromBankName());
-            ps.setString(7, transaction.getToBankName());
-            ps.setBigDecimal(8, transaction.getAmount());
-            ps.setString(9, transaction.getProcessingStatus().name());
-            ps.setTimestamp(10, Timestamp.valueOf(transaction.getIngestionTimeStamp()));
-            ps.setString(11, transaction.getBatchId());
+            ps.setLong(1,        transaction.getIncomingTnxId());
+            ps.setLong(2,        transaction.getSourceSystem().getSourceSystemId());
+            ps.setString(3,      transaction.getSourceSystem().getSourceType().name());
+            ps.setString(4,      transaction.getTransactionType().name());
+            ps.setString(5,      transaction.getChannelType().name());
+            ps.setString(6,      transaction.getFromBankName());
+            ps.setString(7,      transaction.getToBankName());
+            ps.setBigDecimal(8,  transaction.getAmount());
+            ps.setString(9,      transaction.getProcessingStatus().name());
+            ps.setTimestamp(10,  Timestamp.valueOf(transaction.getIngestionTimeStamp()));
+            ps.setString(11,     transaction.getBatchId());
+            ps.executeUpdate();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return transaction;
+    }
+
+    // Persist a new incoming transaction, overriding whatever batchId is on the object.
+    // Use this during batch creation so the FK constraint is always satisfied.
+    @Override
+    public IncomingTransaction save(IncomingTransaction transaction, String batchId) {
+        try (Connection con = dataSource.getConnection()) {
+            String sql = "INSERT INTO incoming_transaction "
+                       + "(incoming_tnx_id, source_system_id, source_type, transaction_type, "
+                       + "channel_type, from_bank_name, to_bank_name, amount, "
+                       + "processing_status, ingestion_time_stamp, batch_id) "
+                       + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement ps = con.prepareStatement(sql);
+            ps.setLong(1,        transaction.getIncomingTnxId());
+            ps.setLong(2,        transaction.getSourceSystem().getSourceSystemId());
+            ps.setString(3,      transaction.getSourceSystem().getSourceType().name());
+            ps.setString(4,      transaction.getTransactionType().name());
+            ps.setString(5,      transaction.getChannelType().name());
+            ps.setString(6,      transaction.getFromBankName());
+            ps.setString(7,      transaction.getToBankName());
+            ps.setBigDecimal(8,  transaction.getAmount());
+            ps.setString(9,      transaction.getProcessingStatus().name());
+            ps.setTimestamp(10,  Timestamp.valueOf(transaction.getIngestionTimeStamp()));
+            ps.setString(11,     batchId);   // use the caller-supplied batchId, not txn.getBatchId()
             ps.executeUpdate();
         } catch (Exception e) {
             e.printStackTrace();

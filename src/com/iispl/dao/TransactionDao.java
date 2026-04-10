@@ -10,6 +10,10 @@ public interface TransactionDao {
     // Persist a new incoming transaction; returns the entity with generated id set
     IncomingTransaction save(IncomingTransaction transaction);
 
+    // Persist a transaction, overriding its batchId with the supplied value.
+    // Use during batch creation to ensure the FK constraint is satisfied.
+    IncomingTransaction save(IncomingTransaction transaction, String batchId);
+
     // Fetch all incoming transactions
     List<IncomingTransaction> findAll();
 
